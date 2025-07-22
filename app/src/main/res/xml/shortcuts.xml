@@ -7,14 +7,15 @@
     <capability
         android:name="custom.actions.intent.ADD_GAS_ENTRY"
         app:queryPatterns="@array/addGasEntryQueries">
+
         <intent>
             <!-- <url-template android:value="https://example.com/gas{?date,odometer,gallons,cost}" /> -->
-            <url-template android:value="https://example.com/gas{date}" />
+            <url-template android:value="https://example.com/gas{?odometer,gallons,cost}" />
+<!--            <parameter-->
+<!--                android:name="date"-->
+<!--                android:key="date"-->
+<!--                android:mimeType="https://schema.org/Date" />-->
             <parameter
-                android:name="date"
-                android:key="date"
-                android:mimeType="https://schema.org/Date" />
-            <!-- <parameter
                 android:name="odometer"
                 android:key="odometer"
                 android:mimeType="https://schema.org/Number" />
@@ -25,7 +26,7 @@
             <parameter
                 android:name="cost"
                 android:key="cost"
-                android:mimeType="https://schema.org/Number" /> -->
+                android:mimeType="https://schema.org/Number" />
         </intent>
     </capability>
 

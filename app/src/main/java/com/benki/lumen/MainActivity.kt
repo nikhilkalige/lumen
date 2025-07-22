@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
     }
     
     private fun handleIntent(intent: Intent): ScreenState {
-        Log.d(TAG, "handleIntent called")
+        Log.d(TAG, "----------------> HandleIntent <-------------------------")
         Log.d(TAG, "Intent action: ${intent.action}")
         Log.d(TAG, "Intent data: ${intent.data}")
         Log.d(TAG, "Intent extras: ${intent.extras}")

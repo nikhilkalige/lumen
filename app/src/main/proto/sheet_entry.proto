@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option java_package = "com.benki.lumen";
+option java_multiple_files = true;
+option java_outer_classname = "SheetEntryProtoFile";
+
+message SheetEntryProto {
+  string id = 1;
+  string date = 2;
+  double gallons = 3;
+  double miles = 4;
+  double dollars = 5;
+  bool isSuccess = 6;
+  string sheetRowUrl = 7;
+  string errorMessage = 8;
+}
+
+message SheetEntryList {
+  repeated SheetEntryProto entries = 1;
+} 

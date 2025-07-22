@@ -33,8 +33,9 @@ androidx-datastore = { module = "androidx.datastore:datastore", version.ref = "d
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomCompiler" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
 converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "converterGson" }
-google-api-client = { module = "com.google.api-client:google-api-client", version.ref = "googleApiClient" }
-google-api-services-sheets = { module = "com.google.apis:google-api-services-sheets", version.ref = "googleApiServicesSheets" }
+google-api-client = { group = "com.google.api-client", name = "google-api-client", version = "2.0.0" }
+google-oauth-client-jetty = { group = "com.google.oauth-client", name = "google-oauth-client-jetty", version = "1.34.1" }
+google-api-services-sheets = { group = "com.google.apis", name = "google-api-services-sheets", version = "v4-rev20220927-2.0.0" }
 google-auth-library-oauth2-http = { module = "com.google.auth:google-auth-library-oauth2-http", version.ref = "googleAuthLibraryOauth2Http" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

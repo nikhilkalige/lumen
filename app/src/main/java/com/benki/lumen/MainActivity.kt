@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        viewModel.handleIntent(intent)
+        handleIntent(intent)
         setContent {
             LumenTheme {
                 LumenNavHost(viewModel = viewModel)
@@ -39,6 +39,23 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        intent?.let { viewModel.handleIntent(it) }
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_VIEW && intent.data != null) {
+            val uri = intent.data!!
+            if (uri.path?.startsWith("/gas") == true) {
+                val odometer = uri.getQueryParameter("odometer")?.toDoubleOrNull()
+                val gallons = uri.getQueryParameter("gallons")?.toDoubleOrNull()
+                val cost = uri.getQueryParameter("cost")?.toDoubleOrNull()
+
+                if (odometer != null && gallons != null && cost != null) {
+                    viewModel.addGasEntry(odometer, gallons, cost)
+                } else {
+                    // Optionally, provide feedback to the user about the invalid intent.
+                }
+            }
+        }
     }
 }

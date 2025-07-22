@@ -15,6 +15,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -24,6 +26,9 @@ import androidx.compose.ui.unit.dp
 import com.benki.lumen.MainViewModel
 import com.benki.lumen.data.SheetEntry
 import com.benki.lumen.ui.components.EntryCard
+import java.time.LocalDate
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 
 @Composable
 fun MainRoute(
@@ -31,9 +36,21 @@ fun MainRoute(
     onNavigateToSettings: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val feedbackMessage by viewModel.feedbackMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(feedbackMessage) {
+        feedbackMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearFeedback()
+        }
+    }
+
     MainScreen(
         entries = uiState.lastEntries,
-        onNavigateToSettings = onNavigateToSettings
+        onNavigateToSettings = onNavigateToSettings,
+        snackbarHostState = snackbarHostState,
+        onDeleteEntry = { viewModel.deleteEntry(it) }
     )
 }
 
@@ -41,9 +58,12 @@ fun MainRoute(
 @Composable
 fun MainScreen(
     entries: List<SheetEntry>,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    snackbarHostState: SnackbarHostState,
+    onDeleteEntry: (String) -> Unit
 ) {
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Fuel Log") },
@@ -69,7 +89,10 @@ fun MainScreen(
             contentPadding = PaddingValues(vertical = 8.dp)
         ) {
             items(entries, key = { it.id }) { entry ->
-                EntryCard(entry = entry)
+                EntryCard(
+                    entry = entry,
+                    onDelete = onDeleteEntry
+                )
             }
         }
     }
@@ -80,14 +103,16 @@ fun MainScreen(
 @Composable
 fun MainScreenPreview() {
     val sampleEntries = listOf(
-        SheetEntry(date = "2024-07-21", gallons = 10.523, miles = 320.1, dollars = 45.50, isSuccess = true, sheetRowUrl = "https://docs.google.com/spreadsheets/d/example/edit#gid=0&range=A2"),
-        SheetEntry(date = "2024-07-10", gallons = 9.876, miles = 295.8, dollars = 42.10, isSuccess = false, errorMessage = "API key invalid."),
-        SheetEntry(date = "2024-06-28", gallons = 11.100, miles = 340.5, dollars = 48.05, isSuccess = true, sheetRowUrl = "https://docs.google.com/spreadsheets/d/example/edit#gid=0&range=A4")
+        SheetEntry(date = LocalDate.of(2024, 7, 21), gallons = 10.523, miles = 320.1, dollars = 45.50, isSuccess = true, sheetRowUrl = "https://docs.google.com/spreadsheets/d/example/edit#gid=0&range=A2"),
+        SheetEntry(date = LocalDate.of(2024, 7, 10), gallons = 9.876, miles = 295.8, dollars = 42.10, isSuccess = false, errorMessage = "API key invalid."),
+        SheetEntry(date = LocalDate.of(2024, 6, 28), gallons = 11.100, miles = 340.5, dollars = 48.05, isSuccess = true, sheetRowUrl = "https://docs.google.com/spreadsheets/d/example/edit#gid=0&range=A4")
     )
     MaterialTheme {
         MainScreen(
             entries = sampleEntries,
-            onNavigateToSettings = {}
+            onNavigateToSettings = {},
+            snackbarHostState = remember { SnackbarHostState() },
+            onDeleteEntry = {}
         )
     }
 } 

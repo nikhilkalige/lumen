@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 // --- ViewModel and State ---
 
@@ -44,39 +46,23 @@ class MainViewModel(
 
     private val _feedbackMessage = MutableStateFlow<String?>(null)
 
-    init {
-        // Feedback can be its own state flow
-        viewModelScope.launch {
-            _feedbackMessage.collect { message ->
-                // This would be combined into uiState if you want to keep it there
-            }
-        }
+    // TODO: Combine feedback message into the main uiState flow
+    val feedbackMessage: StateFlow<String?> = _feedbackMessage.asStateFlow()
+
+    fun addGasEntry(odometer: Double, gallons: Double, cost: Double) {
+        val entry = SheetEntry(
+            date = getCurrentDate(),
+            miles = odometer,
+            gallons = gallons,
+            dollars = cost,
+            isSuccess = false // Assuming this will be updated later
+        )
+        addEntryWithFeedback(entry)
     }
 
-    fun handleIntent(intent: Intent) {
-        if (intent.action == Intent.ACTION_VIEW && intent.data != null) {
-            val uri = intent.data!!
-            if (uri.path?.startsWith("/gas") == true) {
-                val odometer = uri.getQueryParameter("odometer")?.toDoubleOrNull()
-                val gallons = uri.getQueryParameter("gallons")?.toDoubleOrNull()
-                val cost = uri.getQueryParameter("cost")?.toDoubleOrNull()
-                val date = getCurrentDate()
-                if (odometer != null && gallons != null && cost != null) {
-                    addEntryWithFeedback(
-                        SheetEntry(
-                            date = date,
-                            miles = odometer,
-                            gallons = gallons,
-                            dollars = cost,
-                            isSuccess = false // Assuming this will be updated later
-                        )
-                    )
-                } else {
-                    setFeedback("Invalid or missing parameters in intent.")
-                }
-            } else {
-                setFeedback("Unrecognized intent path.")
-            }
+    fun deleteEntry(entryId: String) {
+        viewModelScope.launch {
+            userRepository.deleteEntry(entryId)
         }
     }
 
@@ -109,11 +95,11 @@ class MainViewModel(
             } catch (e: Exception) {
                 setFeedback("Failed to add gas entry: ${e.localizedMessage}")
             }
-        }
+        }                  
     }
 
-    private fun getCurrentDate(): String {
-        return java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+    private fun getCurrentDate(): LocalDate {
+        return LocalDate.now()
     }
 
     companion object {

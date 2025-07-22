@@ -1,6 +1,7 @@
 package com.benki.lumen.data
 
 import androidx.compose.runtime.Immutable
+import java.time.LocalDate
 import java.util.UUID
 
 // Represents a single entry from your Google Sheet.
@@ -8,7 +9,7 @@ import java.util.UUID
 @Immutable
 data class SheetEntry(
     val id: String = UUID.randomUUID().toString(),
-    val date: String,
+    val date: LocalDate,
     val gallons: Double,
     val miles: Double,
     val dollars: Double,

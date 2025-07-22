@@ -1,4 +1,4 @@
-package com.example.vocana.ui.theme
+package com.example.lumen.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

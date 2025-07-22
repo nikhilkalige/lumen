@@ -5,15 +5,15 @@ plugins {
 }
 
 android {
-    namespace = "com.example.vocana"
+    namespace = "com.benki.lumen"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.vocana"
+        applicationId = "com.benki.lumen"
         minSdk = 36
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 5
+        versionName = "5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

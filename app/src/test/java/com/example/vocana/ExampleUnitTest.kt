@@ -1,4 +1,4 @@
-package com.example.vocana
+package com.example.lumen
 
 import org.junit.Test
 

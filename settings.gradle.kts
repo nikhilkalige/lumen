@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Vocana"
+rootProject.name = "Lumen"
 include(":app")
  

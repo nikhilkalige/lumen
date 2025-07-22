@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Query patterns for adding gas entry custom intent -->
+    <string-array name="addGasEntryQueries">
+        <!-- <item>add gas entry</item> -->
+        <!-- <item>add gas entry $odometer miles $gallons liters $cost dollars</item> -->
+        <item>add gas entry $date</item>
+        <!-- <item>log gas $odometer $gallons gallons $cost</item> -->
+        <!-- <item>record gas $odometer $gallons gallons $cost</item> -->
+    </string-array>
+    <string-array name="sayHelloQueries">
+        <item>say hello</item>
+    </string-array>
+</resources> 

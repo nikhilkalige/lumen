@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    
+    <!-- Custom intent capability for adding gas entries -->
+    <capability
+        android:name="custom.actions.intent.ADD_GAS_ENTRY"
+        app:queryPatterns="@array/addGasEntryQueries">
+        <intent>
+            <!-- <url-template android:value="https://example.com/gas{?date,odometer,gallons,cost}" /> -->
+            <url-template android:value="https://example.com/gas{date}" />
+            <parameter
+                android:name="date"
+                android:key="date"
+                android:mimeType="https://schema.org/Date" />
+            <!-- <parameter
+                android:name="odometer"
+                android:key="odometer"
+                android:mimeType="https://schema.org/Number" />
+            <parameter
+                android:name="gallons"
+                android:key="gallons"
+                android:mimeType="https://schema.org/Number" />
+            <parameter
+                android:name="cost"
+                android:key="cost"
+                android:mimeType="https://schema.org/Number" /> -->
+        </intent>
+    </capability>
+
+    <!-- Shortcut for adding gas entry -->
+    <shortcut
+        android:shortcutId="add_gas_entry"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:shortcutShortLabel="@string/add_gas_short_label"
+        android:shortcutLongLabel="@string/add_gas_long_label">
+        
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.benki.lumen"
+            android:targetClass="com.benki.lumen.MainActivity">
+            <extra android:name="action" android:value="add_gas_entry" />
+        </intent>
+        
+        <categories android:name="android.shortcut.conversation" />
+        
+        <capability-binding android:key="custom.actions.intent.ADD_GAS_ENTRY" />
+    </shortcut>
+
+    <capability
+        android:name="custom.actions.intent.SAY_HELLO"
+        app:queryPatterns="@array/sayHelloQueries">
+        <intent>
+            <url-template android:value="https://example.com/hello" />
+        </intent>
+    </capability>
+
+    <capability android:name="actions.intent.START_EXERCISE">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.benki.lumen"
+            android:targetClass="com.benki.lumen.MainActivity">
+            <parameter
+                android:name="exercise.name"
+                android:key="exerciseType"/>
+        </intent>
+    </capability>
+</shortcuts> 

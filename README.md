@@ -1,6 +1,6 @@
-# Vocana - Personal Automation Android App
+# Lumen - Personal Automation Android App
 
-Vocana is a personal automation Android app that integrates with Google Assistant to add gas entries to Google Sheets through voice commands.
+Lumen is a personal automation Android app that integrates with Google Assistant to add gas entries to Google Sheets through voice commands.
 
 ## Features
 
@@ -68,8 +68,8 @@ Example: "Hey Google, add gas entry with 250 miles, 12.5 gallons, and 45.75 doll
 ## Project Structure
 
 ```
-app/src/main/java/com/vocana/app/
-├── VocanaApplication.kt          # Main application class
+app/src/main/java/com/lumen/app/
+├── LumenApplication.kt          # Main application class
 ├── data/
 │   ├── model/
 │   │   └── GasEntry.kt          # Data model for gas entries

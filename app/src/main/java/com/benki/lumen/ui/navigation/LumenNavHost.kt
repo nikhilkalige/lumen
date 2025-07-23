@@ -29,9 +29,8 @@ fun LumenNavHost(viewModel: MainViewModel) {
             val uiState by viewModel.uiState.collectAsState()
             SettingsScreen(
                 initialUrl = uiState.sheetLink ?: "",
-                initialApiKey = uiState.apiKey ?: "",
-                onSave = { url, apiKey ->
-                    viewModel.saveSettings(url, apiKey)
+                onSave = { url ->
+                    viewModel.saveSettings(url)
                     navController.popBackStack()
                 },
                 onNavigateBack = { navController.popBackStack() }

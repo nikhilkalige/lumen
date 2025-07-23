@@ -37,15 +37,12 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onSave: (url: String, apiKey: String) -> Unit,
+    onSave: (url: String) -> Unit,
     onNavigateBack: () -> Unit,
     // In a real app, you would pass the initial values from a ViewModel or data store.
-    initialUrl: String = "",
-    initialApiKey: String = ""
+    initialUrl: String = ""
 ) {
     var sheetUrl by remember { mutableStateOf(initialUrl) }
-    var apiKey by remember { mutableStateOf(initialApiKey) }
-    var isApiKeyVisible by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -86,28 +83,10 @@ fun SettingsScreen(
                 singleLine = true
             )
 
-            // --- Google Sheets API Key Input ---
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Google Sheets API Key") },
-                singleLine = true,
-                visualTransformation = if (isApiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                trailingIcon = {
-                    val image = if (isApiKeyVisible) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder
-                    val description = if (isApiKeyVisible) "Hide API Key" else "Show API Key"
-                    IconButton(onClick = { isApiKeyVisible = !isApiKeyVisible }) {
-                        Icon(imageVector = image, contentDescription = description)
-                    }
-                }
-            )
-
             Spacer(Modifier.weight(1f))
 
             Button(
-                onClick = { onSave(sheetUrl, apiKey) },
+                onClick = { onSave(sheetUrl) },
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 12.dp)
             ) {
@@ -121,6 +100,6 @@ fun SettingsScreen(
 @Composable
 fun SettingsScreenPreview() {
     MaterialTheme {
-        SettingsScreen(onSave = { _, _ -> }, onNavigateBack = {})
+        SettingsScreen(onSave = { _ -> }, onNavigateBack = {})
     }
 } 

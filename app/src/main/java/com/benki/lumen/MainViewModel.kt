@@ -21,7 +21,6 @@ import java.time.LocalDate
 
 data class MainUiState(
     val sheetLink: String? = null,
-    val apiKey: String? = null,
     val lastEntries: List<SheetEntry> = emptyList(),
     val feedbackMessage: String? = null
 )
@@ -36,7 +35,6 @@ class MainViewModel(
         MainUiState(
             lastEntries = entries,
             sheetLink = settings.sheetUrl,
-            apiKey = settings.apiKey
         )
     }.stateIn(
         scope = viewModelScope,
@@ -50,14 +48,21 @@ class MainViewModel(
     val feedbackMessage: StateFlow<String?> = _feedbackMessage.asStateFlow()
 
     fun addGasEntry(odometer: Double, gallons: Double, cost: Double) {
-        val entry = SheetEntry(
-            date = getCurrentDate(),
-            miles = odometer,
-            gallons = gallons,
-            dollars = cost,
-            isSuccess = false // Assuming this will be updated later
-        )
-        addEntryWithFeedback(entry)
+        viewModelScope.launch {
+            val entry = SheetEntry(
+                date = getCurrentDate(),
+                miles = odometer,
+                gallons = gallons,
+                dollars = cost,
+                isSuccess = false // This will be updated by the repository
+            )
+            try {
+                userRepository.addEntry(entry)
+                setFeedback("Gas entry added successfully.")
+            } catch (e: Exception) {
+                setFeedback("Failed to add gas entry: ${e.localizedMessage}")
+            }
+        }
     }
 
     fun deleteEntry(entryId: String) {
@@ -66,9 +71,9 @@ class MainViewModel(
         }
     }
 
-    fun saveSettings(sheetUrl: String, apiKey: String) {
+    fun saveSettings(sheetUrl: String) {
         viewModelScope.launch {
-            userRepository.saveSettings(sheetUrl, apiKey)
+            userRepository.saveSettings(sheetUrl, "")
         }
     }
 
@@ -85,17 +90,6 @@ class MainViewModel(
 
     fun clearFeedback() {
         _feedbackMessage.value = null
-    }
-
-    private fun addEntryWithFeedback(entry: SheetEntry) {
-        viewModelScope.launch {
-            try {
-                userRepository.addEntry(entry)
-                setFeedback("Gas entry added successfully.")
-            } catch (e: Exception) {
-                setFeedback("Failed to add gas entry: ${e.localizedMessage}")
-            }
-        }                  
     }
 
     private fun getCurrentDate(): LocalDate {

@@ -5,5 +5,4 @@ option java_multiple_files = true;
 
 message Settings {
     string sheet_url = 1;
-    string api_key = 2;
 } 

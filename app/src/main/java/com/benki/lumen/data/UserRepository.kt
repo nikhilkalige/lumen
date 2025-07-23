@@ -1,26 +1,25 @@
 package com.benki.lumen.data
 
-import androidx.datastore.core.DataStore
 import com.benki.lumen.Settings
 import com.benki.lumen.SheetEntryList
-import com.benki.lumen.SheetEntryProto
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import androidx.datastore.core.DataStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import android.util.Log
 
 class UserRepository(
-    private val sheetEntryDataStore: DataStore<SheetEntryList>,
-    private val settingsDataStore: DataStore<Settings>
+    private val entryDataStore: DataStore<SheetEntryList>,
+    private val settingsDataStore: DataStore<Settings>,
+    private val sheetsServiceFlow: StateFlow<GoogleSheetsService?>
 ) {
-    val lastEntries: Flow<List<SheetEntry>> = sheetEntryDataStore.data
-        .map { sheetEntryList ->
-            sheetEntryList.entriesList
-                .sortedByDescending { it.date } // Assuming date is a string that can be sorted
-                .map { proto ->
+    val lastEntries: Flow<List<SheetEntry>> = entryDataStore.data.map { sheetEntryList ->
+        sheetEntryList.entriesList
+            .map { proto ->
                 SheetEntry(
                     id = proto.id,
                     date = LocalDate.parse(proto.date),
@@ -31,23 +30,46 @@ class UserRepository(
                     sheetRowUrl = proto.sheetRowUrl.takeIf { it.isNotEmpty() },
                     errorMessage = proto.errorMessage.takeIf { it.isNotEmpty() }
                 )
-            }.take(5)
-        }
-
+            }
+            .sortedByDescending { it.date }
+    }
     val settings: Flow<Settings> = settingsDataStore.data
 
+    private fun extractSheetId(url: String?): String? {
+        if (url == null) return null
+        val regex = "/spreadsheets/u/0/d/([a-zA-Z0-9-_]+)".toRegex()
+        return regex.find(url)?.groupValues?.get(1)
+    }
+
+    private suspend fun persistEntry(entry: SheetEntry) {
+        entryDataStore.updateData { currentEntries ->
+            val protoEntry = com.benki.lumen.SheetEntryProto.newBuilder()
+                .setId(entry.id)
+                .setDate(entry.date.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE))
+                .setGallons(entry.gallons)
+                .setMiles(entry.miles)
+                .setDollars(entry.dollars)
+                .setIsSuccess(entry.isSuccess)
+                .setSheetRowUrl(entry.sheetRowUrl ?: "")
+                .setErrorMessage(entry.errorMessage ?: "")
+                .build()
+            currentEntries.toBuilder()
+                .addEntries(protoEntry)
+                .build()
+        }
+    }
+
     suspend fun addEntry(entry: SheetEntry) {
+        val sheetsService = sheetsServiceFlow.value
         val currentSettings = settings.first()
         val sheetId = extractSheetId(currentSettings.sheetUrl)
-        val apiKey = currentSettings.apiKey
 
-        if (sheetId == null || apiKey.isNullOrEmpty()) {
-            // Persist the entry locally with a failure status
-            persistEntry(entry.copy(isSuccess = false, errorMessage = "Sheet ID or API key not set"))
+        if (sheetsService == null || sheetId == null) {
+            // Persist the entry locally with a failure status if not signed in or configured
+            persistEntry(entry.copy(isSuccess = false, errorMessage = "Please sign in and configure Google Sheets URL in settings."))
             return
         }
 
-        val sheetsService = GoogleSheetsService(apiKey)
         val result = withContext(Dispatchers.IO) {
             sheetsService.appendEntry(sheetId, entry)
         }
@@ -61,43 +83,20 @@ class UserRepository(
     }
 
     suspend fun deleteEntry(entryId: String) {
-        sheetEntryDataStore.updateData { currentEntries ->
-            val updatedEntries = currentEntries.entriesList.filterNot { it.id == entryId }
-            currentEntries.toBuilder()
-                .clearEntries()
-                .addAllEntries(updatedEntries)
-                .build()
+        entryDataStore.updateData { currentEntries ->
+            val indexToRemove = currentEntries.entriesList.indexOfFirst { it.id == entryId }
+            if (indexToRemove != -1) {
+                currentEntries.toBuilder().removeEntries(indexToRemove).build()
+            } else {
+                currentEntries
+            }
         }
-    }
-
-    private suspend fun persistEntry(entry: SheetEntry) {
-        sheetEntryDataStore.updateData { currentEntries ->
-            currentEntries.toBuilder()
-                .addEntries(
-                    SheetEntryProto.newBuilder()
-                        .setId(entry.id)
-                        .setDate(entry.date.format(DateTimeFormatter.ISO_LOCAL_DATE))
-                        .setGallons(entry.gallons)
-                        .setMiles(entry.miles)
-                        .setDollars(entry.dollars)
-                        .setIsSuccess(entry.isSuccess)
-                        .setSheetRowUrl(entry.sheetRowUrl ?: "")
-                        .setErrorMessage(entry.errorMessage ?: "")
-                        .build()
-                )
-                .build()
-        }
-    }
-
-    private fun extractSheetId(url: String): String? {
-        return url.split("/d/")[1].split("/")[0]
     }
 
     suspend fun saveSettings(sheetUrl: String, apiKey: String) {
-        settingsDataStore.updateData {
-            it.toBuilder()
+        settingsDataStore.updateData { currentSettings ->
+            currentSettings.toBuilder()
                 .setSheetUrl(sheetUrl)
-                .setApiKey(apiKey)
                 .build()
         }
     }

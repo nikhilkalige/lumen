@@ -46,12 +46,15 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/INDEX.LIST"
+
         }
     }
 }
 
 dependencies {
     implementation(libs.androidx.room.runtime)
+    implementation(libs.play.services.auth)
 
     // If this project uses any Kotlin source, use Kotlin Symbol Processing (KSP)
     // See Add the KSP plugin to your project
@@ -81,6 +84,12 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation(libs.androidx.datastore)
     implementation(libs.protobuf.javalite)
+    implementation(libs.google.api.client.android)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+    implementation(libs.google.auth.library.oauth2.http)
+    implementation(libs.kotlinx.coroutines.play.services.v180)
 }
 
 protobuf {

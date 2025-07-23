@@ -8,9 +8,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.datastore.core.DataStore
 import androidx.datastore.dataStore
+import com.benki.lumen.auth.AuthManager
+import com.benki.lumen.data.GoogleSheetsService
 import com.benki.lumen.data.UserRepository
-import com.benki.lumen.ui.navigation.LumenNavHost
-import com.example.lumen.ui.theme.LumenTheme
+import com.benki.lumen.ui.LumenApp
+import kotlinx.coroutines.flow.MutableStateFlow
 
 private val Context.dataStore: DataStore<SheetEntryList> by dataStore(
     fileName = "sheet_entries.pb",
@@ -23,17 +25,27 @@ private val Context.settingsDataStore: DataStore<Settings> by dataStore(
 )
 
 class MainActivity : ComponentActivity() {
+    private val googleSheetsServiceFlow = MutableStateFlow<GoogleSheetsService?>(null)
+    private val authManager by lazy { AuthManager(this) }
+    private val userRepository by lazy {
+        UserRepository(dataStore, settingsDataStore, googleSheetsServiceFlow)
+    }
     private val viewModel: MainViewModel by viewModels {
-        MainViewModel.Factory(UserRepository(dataStore, settingsDataStore))
+        MainViewModel.Factory(userRepository)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
+
         setContent {
-            LumenTheme {
-                LumenNavHost(viewModel = viewModel)
-            }
+            LumenApp(
+                viewModel = viewModel,
+                authManager = authManager,
+                onSignedIn = { credentials ->
+                    googleSheetsServiceFlow.value = GoogleSheetsService(credentials)
+                }
+            )
         }
     }
 

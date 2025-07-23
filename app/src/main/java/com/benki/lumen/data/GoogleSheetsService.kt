@@ -1,21 +1,21 @@
 package com.benki.lumen.data
 
+import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.sheets.v4.Sheets
 import com.google.api.services.sheets.v4.model.AppendValuesResponse
 import com.google.api.services.sheets.v4.model.ValueRange
-import com.google.api.client.http.javanet.NetHttpTransport
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential
+import com.google.auth.http.HttpCredentialsAdapter
+import com.google.auth.oauth2.GoogleCredentials
 
 class GoogleSheetsService(
-    private val apiKey: String,
+    credentials: GoogleCredentials,
     private val transport: NetHttpTransport = NetHttpTransport(),
     private val jsonFactory: GsonFactory = GsonFactory.getDefaultInstance()
 ) {
     private val service: Sheets by lazy {
-        val credential = GoogleCredential.Builder()
-        val credential = GoogleCredential().setAccessToken(apiKey)
-        Sheets.Builder(transport, jsonFactory, credential)
+        val initializer = HttpCredentialsAdapter(credentials)
+        Sheets.Builder(transport, jsonFactory, initializer)
             .setApplicationName("Lumen")
             .build()
     }

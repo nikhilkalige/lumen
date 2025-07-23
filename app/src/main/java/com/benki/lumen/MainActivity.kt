@@ -12,7 +12,14 @@ import com.benki.lumen.auth.AuthManager
 import com.benki.lumen.data.GoogleSheetsService
 import com.benki.lumen.data.UserRepository
 import com.benki.lumen.ui.LumenApp
+import com.benki.lumen.GoogleSheetsServiceViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalContext
+// import androidx.compose.ui.platform.LocalDataStore
+//import androidx.compose.ui.platform.LocalSettingsDataStore
+
+import androidx.compose.runtime.remember
 
 private val Context.dataStore: DataStore<SheetEntryList> by dataStore(
     fileName = "sheet_entries.pb",
@@ -25,25 +32,29 @@ private val Context.settingsDataStore: DataStore<Settings> by dataStore(
 )
 
 class MainActivity : ComponentActivity() {
-    private val googleSheetsServiceFlow = MutableStateFlow<GoogleSheetsService?>(null)
     private val authManager by lazy { AuthManager(this) }
-    private val userRepository by lazy {
-        UserRepository(dataStore, settingsDataStore, googleSheetsServiceFlow)
-    }
-    private val viewModel: MainViewModel by viewModels {
-        MainViewModel.Factory(userRepository)
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        handleIntent(intent)
-
         setContent {
+            val sheetsServiceViewModel: GoogleSheetsServiceViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+            val userRepository = remember {
+                UserRepository(dataStore, settingsDataStore, sheetsServiceViewModel.serviceFlow)
+            }
+            val mainViewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = MainViewModel.Factory(userRepository))
+
+            // Handle intent after mainViewModel is available
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                handleIntent(intent, mainViewModel)
+            }
+
             LumenApp(
-                viewModel = viewModel,
+                viewModel = mainViewModel,
                 authManager = authManager,
                 onSignedIn = { credentials ->
-                    googleSheetsServiceFlow.value = GoogleSheetsService(credentials)
+                    val service = com.benki.lumen.data.GoogleSheetsService(credentials)
+                    sheetsServiceViewModel.setService(service)
+                    android.util.Log.d("MainActivity", "Set service in ViewModel: $service")
                 }
             )
         }
@@ -51,10 +62,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        handleIntent(intent)
+        // The intent handling is now moved to setContent, so this method is no longer needed
+        // unless the intent is received before setContent is called.
+        // For now, keeping it as is, but it might be redundant.
     }
 
-    private fun handleIntent(intent: Intent?) {
+    private fun handleIntent(intent: Intent?, mainViewModel: MainViewModel) {
         if (intent?.action == Intent.ACTION_VIEW && intent.data != null) {
             val uri = intent.data!!
             if (uri.path?.startsWith("/gas") == true) {
@@ -63,7 +76,7 @@ class MainActivity : ComponentActivity() {
                 val cost = uri.getQueryParameter("cost")?.toDoubleOrNull()
 
                 if (odometer != null && gallons != null && cost != null) {
-                    viewModel.addGasEntry(odometer, gallons, cost)
+                    mainViewModel.addGasEntry(odometer, gallons, cost)
                 } else {
                     // Optionally, provide feedback to the user about the invalid intent.
                 }

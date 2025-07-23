@@ -26,30 +26,52 @@ fun LumenApp(
     onSignedIn: (GoogleCredentials) -> Unit
 ) {
     var isSignedIn by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         scope.launch {
-            val credential = authManager.signInAndAuthorize()
-            if (credential != null) {
-                onSignedIn(credential)
-                isSignedIn = true
-            } else {
-                // Optionally handle sign-in failure, e.g., show an error message
+            when (val result = authManager.authorize()) {
+                is com.benki.lumen.auth.AuthorizationResult.Success -> {
+                    onSignedIn(result.credentials)
+                    isSignedIn = true
+                    isLoading = false
+                }
+                is com.benki.lumen.auth.AuthorizationResult.ResolutionRequired -> {
+                    // TODO: Handle intent sender for user interaction (not possible in pure @Composable)
+                    // For now, treat as failure or keep loading
+                    isLoading = false
+                    errorMessage = "User interaction required for sign-in. Please restart the app."
+                }
+                is com.benki.lumen.auth.AuthorizationResult.Failure -> {
+                    isLoading = false
+                    errorMessage = "Authorization failed."
+                }
             }
         }
     }
 
     LumenTheme {
-        if (isSignedIn) {
-            LumenNavHost(viewModel = viewModel)
-        } else {
-            // Show a loading indicator while signing in
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
+        when {
+            isSignedIn -> {
+                LumenNavHost(viewModel = viewModel)
+            }
+            isLoading -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+            errorMessage != null -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.Text(text = errorMessage!!)
+                }
             }
         }
     }

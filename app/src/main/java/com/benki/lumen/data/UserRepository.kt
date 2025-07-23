@@ -17,6 +17,9 @@ class UserRepository(
     private val settingsDataStore: DataStore<Settings>,
     private val sheetsServiceFlow: StateFlow<GoogleSheetsService?>
 ) {
+    init {
+        android.util.Log.d("UserRepository", "sheetsServiceFlow instance: ${sheetsServiceFlow.hashCode()}")
+    }
     val lastEntries: Flow<List<SheetEntry>> = entryDataStore.data.map { sheetEntryList ->
         sheetEntryList.entriesList
             .map { proto ->
@@ -42,6 +45,7 @@ class UserRepository(
     }
 
     private suspend fun persistEntry(entry: SheetEntry) {
+        Log.d("UserRepository", "Persisting entry: $entry")
         entryDataStore.updateData { currentEntries ->
             val protoEntry = com.benki.lumen.SheetEntryProto.newBuilder()
                 .setId(entry.id)
@@ -61,10 +65,12 @@ class UserRepository(
 
     suspend fun addEntry(entry: SheetEntry) {
         val sheetsService = sheetsServiceFlow.value
+        Log.d("UserRepository", "addEntry called. sheetsServiceFlow.value = $sheetsService")
         val currentSettings = settings.first()
         val sheetId = extractSheetId(currentSettings.sheetUrl)
 
         if (sheetsService == null || sheetId == null) {
+            Log.w("UserRepository", "sheetsService or sheetId is null. Persisting entry locally.")
             // Persist the entry locally with a failure status if not signed in or configured
             persistEntry(entry.copy(isSuccess = false, errorMessage = "Please sign in and configure Google Sheets URL in settings."))
             return

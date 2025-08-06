@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">Lumen</string>
+    <string name="web_client_id">YOUR_WEB_CLIENT_ID</string>
+
+    <!-- Gas tracking shortcuts -->
+    <string name="add_gas_short_label">Add Gas Entry</string>
+    <string name="add_gas_long_label">Add a new gas entry with miles, gallons, and cost</string>
+    <string name="track_gas_short_label">Track Gas Mileage</string>
+    <string name="track_gas_long_label">Track your gas mileage and expenses</string>
+    <string name="gas_entry">gas entry</string>
+    <string name="gas_tracking">gas tracking</string>
+
+    <!-- Gas entry parameters -->
+    <string name="miles_label">Miles</string>
+    <string name="gallons_label">Gallons</string>
+    <string name="cost_label">Cost</string>
+    <string name="add_entry_success">Gas entry added successfully</string>
+    <string name="add_entry_error">Failed to add gas entry</string>
+
+    <!-- Query patterns for adding gas entry custom intent -->
+    <string-array name="addGasEntryQueries">
+        <!-- Odometer First -->
+        <item>gas entry $odometer miles $gallons gallons for $cost dollars</item>
+        <item>gas entry $odometer miles $gallons gallons and $cost dollars</item>
+        <item>gas entry $odometer miles and $gallons gallons and $cost dollars</item>
+        <item>gas entry $odometer miles $gallons gallons $cost dollars</item>
+        <item>gas entry $odometer miles $gallons gallons $cost bucks</item>
+        <item>gas entry $odometer miles $gallons gallons $cost bugs</item>
+
+        <!-- Gallons First -->
+        <item>gas entry $gallons gallons $odometer miles for $cost dollars</item>
+
+        <!-- Cost First -->
+        <item>gas entry for $cost dollars $gallons gallons at $odometer miles</item>
+    </string-array>
+</resources>

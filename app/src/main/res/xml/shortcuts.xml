@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts
+    xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <capability android:name="custom.actions.intent.ADD_GAS_ENTRY" app:queryPatterns="@array/addGasEntryQueries">
+        <intent>
+            <url-template android:value="lumen://gas{?odometer,gallons,cost}" />
+
+            <parameter
+                android:name="odometer"
+                android:key="odometer"
+                android:mimeType="https://schema.org/Number"/>
+            <parameter
+                android:name="gallons"
+                android:key="gallons"
+                android:mimeType="https://schema.org/Number"/>
+            <parameter
+                android:name="cost"
+                android:key="cost"
+                android:mimeType="https://schema.org/Number"/>
+        </intent>
+    </capability>
+</shortcuts>

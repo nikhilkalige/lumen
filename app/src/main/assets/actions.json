@@ -1,0 +1,39 @@
+{
+  "actions": [
+    {
+      "name": "actions.intent.ADD_GAS_ENTRY",
+      "description": "Add a new gas entry with miles, gallons, and cost",
+      "parameters": [
+        {
+          "name": "miles",
+          "type": "number",
+          "required": true,
+          "description": "Number of miles driven"
+        },
+        {
+          "name": "gallons",
+          "type": "number",
+          "required": true,
+          "description": "Number of gallons of gas"
+        },
+        {
+          "name": "cost",
+          "type": "number",
+          "required": true,
+          "description": "Cost in dollars"
+        }
+      ],
+      "training_phrases": [
+        "add gas entry with {miles} miles {gallons} gallons {cost} dollars",
+        "add gas entry {miles} miles {gallons} gallons {cost} dollars",
+        "gas entry {miles} miles {gallons} gallons {cost} dollars",
+        "add fuel entry {miles} miles {gallons} gallons {cost} dollars",
+        "log gas {miles} miles {gallons} gallons {cost} dollars",
+        "record gas {miles} miles {gallons} gallons {cost} dollars",
+        "add gas {miles} {gallons} {cost}",
+        "gas {miles} {gallons} {cost}",
+        "fuel {miles} {gallons} {cost}"
+      ]
+    }
+  ]
+} 

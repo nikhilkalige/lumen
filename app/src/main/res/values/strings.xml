@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Lumen</string>
+    <string-array name="addGasEntryQueries">
+        <!-- <item>add gas entry</item> -->
+
+        <item>add gas entry $odometer miles $gallons gallons $cost dollars</item>
+        <item>add gas entry $odometer miles $gallons liters $cost dollars</item>
+
+        <!--        <item>add gas entry $date</item>-->
+        <!-- <item>log gas $odometer $gallons gallons $cost</item> -->
+        <!-- <item>record gas $odometer $gallons gallons $cost</item> -->
+    </string-array>
+</resources>

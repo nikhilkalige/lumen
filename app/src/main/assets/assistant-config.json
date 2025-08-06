@@ -1,0 +1,43 @@
+{
+  "assistant": {
+    "app_name": "Vocana Gas Tracker",
+    "version": "1.0.0",
+    "voice_commands": {
+      "gas_entry": {
+        "patterns": [
+          "add gas entry with {miles} miles {gallons} gallons {cost} dollars",
+          "add gas entry {miles} {gallons} {cost}",
+          "gas entry {miles} miles {gallons} gallons {cost} dollars"
+        ],
+        "parameters": {
+          "miles": {
+            "type": "number",
+            "required": true,
+            "description": "Number of miles driven"
+          },
+          "gallons": {
+            "type": "number",
+            "required": true,
+            "description": "Number of gallons of gas"
+          },
+          "cost": {
+            "type": "number",
+            "required": true,
+            "description": "Cost in dollars"
+          }
+        }
+      }
+    },
+    "sheets": {
+      "spreadsheet_name": "Gas Entries",
+      "sheet_name": "Gas Entries",
+      "columns": [
+        "Timestamp",
+        "Miles",
+        "Gallons",
+        "Cost",
+        "Location"
+      ]
+    }
+  }
+} 

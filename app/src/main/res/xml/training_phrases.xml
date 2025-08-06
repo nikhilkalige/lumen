@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<training-phrases>
+    <training-phrase intentName="actions.intent.ADD_GAS_ENTRY">
+        <phrase>add gas entry with {miles} miles {gallons} gallons {cost} dollars</phrase>
+        <phrase>add gas entry {miles} miles {gallons} gallons {cost} dollars</phrase>
+        <phrase>gas entry {miles} miles {gallons} gallons {cost} dollars</phrase>
+        <phrase>add fuel entry {miles} miles {gallons} gallons {cost} dollars</phrase>
+        <phrase>log gas {miles} miles {gallons} gallons {cost} dollars</phrase>
+        <phrase>record gas {miles} miles {gallons} gallons {cost} dollars</phrase>
+        <phrase>add gas {miles} {gallons} {cost}</phrase>
+        <phrase>gas {miles} {gallons} {cost}</phrase>
+        <phrase>fuel {miles} {gallons} {cost}</phrase>
+    </training-phrase>
+</training-phrases> 

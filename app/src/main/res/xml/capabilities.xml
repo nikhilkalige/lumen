@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<capabilities>
+    <capability name="actions.capability.ADD_GAS_ENTRY">
+        <intent intentName="actions.intent.ADD_GAS_ENTRY">
+            <parameter name="miles">
+                <entity-set-reference entitySetId="miles_entity_set"/>
+            </parameter>
+            <parameter name="gallons">
+                <entity-set-reference entitySetId="gallons_entity_set"/>
+            </parameter>
+            <parameter name="cost">
+                <entity-set-reference entitySetId="cost_entity_set"/>
+            </parameter>
+        </intent>
+    </capability>
+</capabilities> 

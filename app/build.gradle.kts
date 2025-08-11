@@ -100,6 +100,12 @@ dependencies {
 
     implementation(libs.google.api.client)
     implementation(libs.google.api.services.sheets)
+    implementation(libs.google.api.services.drive)
+    implementation(libs.google.api.services.drive)
+    implementation(libs.google.api.services.oauth2)
+    implementation(libs.androidx.material.icons.extended.android) // Use the latest version
+
+
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.benki.lumen.model.FuelEntry
+import com.benki.lumen.network.AuthorizationRequiredException
 import com.benki.lumen.network.GoogleSheetsService
 import com.benki.lumen.repository.FuelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -75,11 +76,7 @@ class FuelViewModel @Inject constructor(
         lastFailedOperation?.let { performOperation(it) }
     }
 
-    fun retry(entryId: String) {
-    }
-
-    fun delete(entryId: String) {
-    }
+    
 
     fun handleIntentUri(intentUri: Uri?) {
         if (intentUri == null) return
@@ -117,7 +114,7 @@ class FuelViewModel @Inject constructor(
                 lastFailedOperation = null
                 emitEvent(UiEvent.DataSynced)
                 emitEvent(UiEvent.ShowMessage("Operation successful!"))
-            } catch (e: GoogleSheetsService.AuthorizationRequiredException) {
+            } catch (e: AuthorizationRequiredException) {
                 lastFailedOperation = operation
                 e.pendingIntent?.let {
                     emitEvent(UiEvent.ShowAuthorizationPrompt(it))

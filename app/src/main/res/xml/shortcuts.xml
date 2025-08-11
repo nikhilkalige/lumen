@@ -8,7 +8,7 @@
         app:queryPatterns="@array/addGasEntryQueries">
 
         <intent>
-            <url-template android:value="https://example.com/gas{?odometer,gallons,cost}" />
+            <url-template android:value="lumen://gas{?odometer,gallons,cost}" />
             <parameter
                 android:name="odometer"
                 android:key="odometer"

@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.benki.lumen.network.SelectedSpreadsheet
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -19,6 +20,8 @@ class SettingsDataStore(private val context: Context) {
 
     companion object Keys {
         val SHEET_ID = stringPreferencesKey("sheet_id")
+        val SHEET_NAME = stringPreferencesKey("sheet_name")
+        val SHEET_URI = stringPreferencesKey("sheet_uri")
         val ACCESS_TOKEN = stringPreferencesKey("access_token")
         val REFRESH_TOKEN = stringPreferencesKey("refresh_token")
     }
@@ -29,8 +32,20 @@ class SettingsDataStore(private val context: Context) {
 
     val refreshTokenFlow: Flow<String?> = context.lumenDataStore.data.map { it[Keys.REFRESH_TOKEN] }
 
-    suspend fun saveSheetId(sheetId: String) {
-        context.lumenDataStore.edit { it[Keys.SHEET_ID] = sheetId }
+    suspend fun saveSheet(sheetId: SelectedSpreadsheet) {
+        context.lumenDataStore.edit {
+            it[Keys.SHEET_ID] = sheetId.id
+            it[Keys.SHEET_NAME] = sheetId.name
+            it[Keys.SHEET_URI] = sheetId.uri.toString()
+        }
+    }
+
+    suspend fun clearSheet() {
+        context.lumenDataStore.edit {
+            it.remove(Keys.SHEET_ID)
+            it.remove(Keys.SHEET_NAME)
+            it.remove(Keys.SHEET_URI)
+        }
     }
 
     suspend fun saveAccessToken(token: String) {

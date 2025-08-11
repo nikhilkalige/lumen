@@ -1,11 +1,11 @@
 package com.benki.lumen.network
 
-//import com.benki.lumen.BuildConfig // For CLIENT_ID
 import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Log
-import androidx.credentials.CredentialManager
-import com.benki.lumen.datastore.SettingsDataStore
 import com.benki.lumen.model.FuelEntry
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
@@ -13,6 +13,10 @@ import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.Scope
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
+import com.google.api.services.drive.Drive
+import com.google.api.services.drive.DriveScopes
+import com.google.api.services.oauth2.Oauth2
+import com.google.api.services.oauth2.Oauth2Scopes
 import com.google.api.services.sheets.v4.Sheets
 import com.google.api.services.sheets.v4.SheetsScopes
 import com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest
@@ -23,221 +27,430 @@ import com.google.api.services.sheets.v4.model.ValueRange
 import com.google.auth.http.HttpCredentialsAdapter
 import com.google.auth.oauth2.AccessToken
 import com.google.auth.oauth2.GoogleCredentials
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.text.get
 
-const val TAG = "GoogleSheetsService"
+private const val TAG = "GoogleSheetsService"
+private const val APP_NAME = "Lumen" // Define app name as a constant
+
+// Add this data class to represent a selected spreadsheet
+data class SelectedSpreadsheet(
+    val id: String,
+    val name: String,
+    val uri: Uri
+)
+
+// Add these methods to your GoogleSheetsService class:
 
 /**
- * Responsible for performing network operations against Google Sheets REST API.
- * Uses [CredentialManager] to obtain OAuth2 tokens following best practices.
+ * Creates an intent to open Google Drive's file picker for spreadsheet selection.
+ * This should be launched using an ActivityResultLauncher.
+ */
+fun createFilePickerIntent(): Intent {
+    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        // addCategory(Intent.CATEGORY_OPENABLE)
+        type = "application/vnd.google-apps.spreadsheet"
+        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
+            "application/vnd.google-apps.spreadsheet"
+        ))
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+
+        // This ensures we're using Google Drive
+        // putExtra("android.provider.extra.SHOW_ADVANCED", true)
+        // putExtra("android.content.extra.SHOW_ADVANCED", true)
+    }
+    return intent
+}
+
+/**
+ * Alternative method using Google Drive's picker (requires additional setup)
+ * This creates an intent to open Google Drive's native picker
+ */
+fun createDrivePickerIntent(): Intent {
+    return Intent(Intent.ACTION_GET_CONTENT).apply {
+        type = "application/vnd.google-apps.spreadsheet"
+        addCategory(Intent.CATEGORY_OPENABLE)
+        putExtra(Intent.EXTRA_LOCAL_ONLY, false)
+        // Force Google Drive to handle this
+        setPackage("com.google.android.apps.docs")
+    }
+}
+
+/**
+ * Helper method to extract file ID from content URI using content resolver
+ */
+private fun extractIdFromContentUri(uri: Uri): String? {
+    return try {
+        // Try to get the document ID
+        val docId = uri.lastPathSegment?.split(":")?.lastOrNull()
+        docId
+    } catch (e: Exception) {
+        Log.e(TAG, "Could not extract ID from content URI", e)
+        null
+    }
+}
+
+/**
+ * Extracts Google Drive file ID from various URI formats
+ */
+private fun extractFileIdFromUri(uri: Uri): String? {
+    // Handle different URI formats
+    return when {
+        // Direct Google Drive URI
+        uri.toString().contains("drive.google.com") -> {
+            // Extract ID from URL like: https://drive.google.com/file/d/FILE_ID/...
+            val pattern = "/d/([a-zA-Z0-9-_]+)".toRegex()
+            pattern.find(uri.toString())?.groupValues?.get(1)
+        }
+        // Content URI from picker
+        uri.scheme == "content" -> {
+            // For content URIs, we might need to query the content resolver
+            // or parse the last path segment
+            uri.lastPathSegment?.let { segment ->
+                // Sometimes the ID is in the last segment
+                if (segment.matches("[a-zA-Z0-9-_]+".toRegex())) {
+                    segment
+                } else {
+                    // Try to extract from the full path
+                    extractIdFromContentUri(uri)
+                }
+            }
+        }
+        else -> null
+    }
+}
+
+private fun getFileNameFromUri(context: Context, uri: Uri): String? {
+    // Use a ContentResolver to query the file's metadata.
+    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            // Get the index of the DISPLAY_NAME column.
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (nameIndex >= 0) {
+                // Return the file name.
+                return cursor.getString(nameIndex)
+            }
+        }
+    }
+    // Return null if the query fails or the column doesn't exist.
+    return null
+}
+
+
+// Data class for sheet information
+data class SheetInfo(
+    val sheetId: Int,
+    val title: String
+)
+
+
+/**
+ * Custom exception to signal that user authorization UI needs to be shown.
+ */
+class AuthorizationRequiredException(
+    val pendingIntent: PendingIntent
+) : Exception("User authorization required.")
+
+/**
+ * Manages all interactions with Google Sheets and Drive APIs.
+ * This service handles OAuth2 authorization, token management, and API requests
+ * in a centralized and efficient manner.
  */
 @Singleton
-class GoogleSheetsService @Inject constructor(
-    private val context: Context,
-    private val settings: SettingsDataStore,
-) {
+class GoogleSheetsService @Inject constructor(private val context: Context) {
 
     private val authorizationClient by lazy { Identity.getAuthorizationClient(context) }
+    private val httpTransport by lazy { NetHttpTransport() }
+    private val jsonFactory by lazy { GsonFactory.getDefaultInstance() }
+
+    // Use a Mutex to ensure thread-safe access to cached services and credentials
+    private val serviceMutex = Mutex()
+
+    // Cache the API service clients for efficiency. @Volatile ensures visibility across threads.
+    @Volatile
+    private var sheetsService: Sheets? = null
+    @Volatile
+    private var driveService: Drive? = null
 
     private val requiredScopes = listOf(
-        Scope(SheetsScopes.DRIVE_FILE)
+        Scope(SheetsScopes.DRIVE_FILE), // Needed to create/access files opened by the app
+        Scope(DriveScopes.DRIVE_READONLY), // Needed to search all of the user's spreadsheets
+        Scope(Oauth2Scopes.USERINFO_EMAIL) // Correct scope for fetching user's email
     )
 
     /**
-     * Initiates the Google Sheets API authorization flow and returns an authorized Sheets service instance.
-     * This function should be called from a UI component (Activity/Fragment) that can handle
-     * the authorization intent.
-     *
-     * @param onAuthorizationNeeded A callback function that will be invoked if authorization
-     * is required. It provides an [PendingIntent] which
-     * your UI component should launch using `ActivityResultLauncher`.
-     * @return An authorized [Sheets] service instance.
-     * @throws Exception if authorization fails or is cancelled.
+     * Checks if the user is currently authorized without triggering a UI flow.
+     * @return `true` if authorized, `false` otherwise.
      */
-    suspend fun getAuthorizedSheetsService(): Sheets {
-        return withContext(Dispatchers.IO) {
-            val authorizationRequest = AuthorizationRequest.builder()
-                .setRequestedScopes(requiredScopes)
-                .build()
-
-            try {
-                // Attempt to authorize silently (e.g., if user already granted permissions)
-                val authorizationResult =
-                    authorizationClient.authorize(authorizationRequest).await()
-
-                // Use hasResolution() to determine if user interaction is needed.
-                if (!authorizationResult.hasResolution()) {
-                    Log.d(TAG, "Authorization already granted (silent authorization).")
-                    buildSheetsService(authorizationResult)
-                } else {
-
-                    Log.d(TAG, "Authorization needed, launching UI.")
-                    val pendingIntent = authorizationResult.pendingIntent
-                    Log.d(TAG, "Authorization needed; throwing exception with PendingIntent.")
-                    throw AuthorizationRequiredException(pendingIntent = pendingIntent)
-                    // If authorization is needed, trigger the callback to launch the UI
-                    // The actual UI launch happens in the Activity/Fragment
-//                    authorizationResult.pendingIntent?.let {
-//                        onAuthorizationNeeded(it) // Pass the PendingIntent directly
-//                    } ?: run {
-//                        // This case should ideally not happen if hasResolution() is true,
-//                        // but it's good for robustness.
-//                        Log.e(TAG, "hasResolution() is true but pendingIntent is null.")
-//                        throw Exception("Authorization UI intent is missing.")
-//                    }
-                    // We expect the UI to call setAuthorizationResult() later
-                    // This part needs to be handled by the calling UI component.
-                    // For simplicity, we'll throw an exception here, but in a real app,
-                    // you might use a shared flow/callback to resume this coroutine
-                    // after the UI handles the result.
-                    // throw AuthorizationRequiredException("User authorization required.")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error during authorization check: ${e.message}", e)
-                throw e
-            }
+    suspend fun isAuthorized(): Boolean {
+        return try {
+            getCredentials()
+            true
+        } catch (e: AuthorizationRequiredException) {
+            false
+        } catch(e: Exception) {
+            // Any other exception (network error, service issue, etc.) also means
+            // we cannot proceed, so we consider the user not authorized.
+            Log.e(TAG, "An unexpected error occurred during authorization check", e)
+            false
         }
     }
 
     /**
-     * Builds the Google Sheets service client using the provided authorization result.
+     * Retrieves a credential, triggering authorization if needed. This is the core auth function.
      */
-    private fun buildSheetsService(authorizationResult: AuthorizationResult): Sheets {
-        val accessToken = authorizationResult.accessToken
-        // Note: AuthorizationClient handles refresh tokens internally.
-        // You generally don't need to manually manage refresh tokens with this API.
-        val credentials = GoogleCredentials.create(
-            AccessToken(
-                accessToken,
-                null
-            )
-        ) // Expiration time can be null if managed by client library
-
-        return Sheets.Builder(
-            NetHttpTransport(),
-            GsonFactory.getDefaultInstance(),
-            HttpCredentialsAdapter(credentials)
-        )
-            .setApplicationName("Lumen")
+    private suspend fun getCredentials(): GoogleCredentials {
+        val authRequest = AuthorizationRequest.builder()
+            .setRequestedScopes(requiredScopes)
             .build()
+
+        val authResult: AuthorizationResult = try {
+            authorizationClient.authorize(authRequest).await()
+        } catch (e: Exception) {
+            Log.e(TAG, "Authorization failed", e)
+            throw e
+        }
+
+        if (authResult.hasResolution()) {
+            // Authorization is required. Throw exception with the intent for the UI to handle.
+            throw AuthorizationRequiredException(authResult.pendingIntent!!)
+        }
+
+        // Authorization successful, create and return credentials
+        return GoogleCredentials.create(AccessToken(authResult.accessToken, null))
     }
 
+    /**
+     * Lazily initializes and returns an authorized Sheets service client.
+     * Subsequent calls will return the cached instance.
+     */
+    private suspend fun getSheetsService(): Sheets = serviceMutex.withLock {
+        sheetsService ?: run {
+            val credentials = getCredentials()
+            Sheets.Builder(httpTransport, jsonFactory, HttpCredentialsAdapter(credentials))
+                .setApplicationName(APP_NAME)
+                .build().also { sheetsService = it }
+        }
+    }
 
     /**
-     * Adds a new row of data to the specified Google Sheet.
-     *
-     * @param fuelEntry The [FuelEntry] object containing the data to add.
-     * @param spreadsheetId The ID of the spreadsheet.
-     * @param range The A1 notation or R1C1 notation of the range where data should be appended.
-     * E.g., "Sheet1!A1" will append to the first available row in Sheet1.
-     * @param onAuthorizationNeeded Callback for when authorization UI needs to be launched.
-     * @throws Exception if an API error occurs or authorization fails.
+     * Lazily initializes and returns an authorized Drive service client.
      */
-    suspend fun addData(
-        fuelEntry: FuelEntry,
-        spreadsheetId: String,
-        range: String,
-    ) {
-        return withContext(Dispatchers.IO) {
+    private suspend fun getDriveService(): Drive = serviceMutex.withLock {
+        driveService ?: run {
+            val credentials = getCredentials()
+            Drive.Builder(httpTransport, jsonFactory, HttpCredentialsAdapter(credentials))
+                .setApplicationName(APP_NAME)
+                .build().also { driveService = it }
+        }
+    }
+
+    /**
+     * Signs the user out and clears all cached credentials and service clients.
+     */
+//    suspend fun signOut() = serviceMutex.withLock {
+//        try {
+//            authorizationClient.signOut().await()
+//        } catch (e: Exception) {
+//            Log.e(TAG, "Sign out failed", e)
+//        } finally {
+//            // Clear cached services regardless of sign-out success
+//            sheetsService = null
+//            driveService = null
+//        }
+//    }
+
+    /**
+     * Fetches the email address of the signed-in user.
+     * Note: Requires the 'userinfo.email' scope.
+     */
+    suspend fun getSignedInUserEmail(): String? = withContext(Dispatchers.IO) {
+        serviceMutex.withLock {
+            val credentials = getCredentials()
+            val oauth2Service = Oauth2.Builder(httpTransport, jsonFactory, HttpCredentialsAdapter(credentials))
+                .setApplicationName(APP_NAME)
+                .build()
             try {
-                val sheetsService = getAuthorizedSheetsService()
-
-                // Create a list of lists for the row data
-                val rowData = listOf(
-                    listOf(
-                        fuelEntry.date,
-                        fuelEntry.gallons,
-                        fuelEntry.miles,
-                        fuelEntry.cost,
-                    )
-                )
-
-                val body = ValueRange().setValues(rowData)
-
-                sheetsService.spreadsheets().values()
-                    .append(spreadsheetId, range, body)
-                    .setValueInputOption("USER_ENTERED") // How input data is interpreted
-                    .execute()
-
-                Log.d(TAG, "Data added successfully to spreadsheet $spreadsheetId in range $range")
-            } catch (e: AuthorizationRequiredException) {
-                throw e
+                oauth2Service.userinfo().get().execute()?.email
             } catch (e: Exception) {
-                Log.e(TAG, "Error adding data to spreadsheet: ${e.message}", e)
-                throw e
+                Log.e(TAG, "Could not fetch user email", e)
+                null
             }
         }
     }
 
     /**
-     * Deletes a specific row from a Google Sheet.
-     *
-     * @param spreadsheetId The ID of the spreadsheet.
-     * @param sheetId The GID (Grid ID) of the specific sheet within the spreadsheet.
-     * You can find this in the URL of your Google Sheet (e.g., .../edit#gid=123456789).
-     * @param rowNumber The 1-based index of the row to delete. For example, 1 for the first row.
-     * @param onAuthorizationNeeded Callback for when authorization UI needs to be launched.
-     * @throws Exception if an API error occurs or authorization fails.
+     * Searches for a spreadsheet by its exact name.
+     * @param name The exact name of the spreadsheet to find.
+     * @return The spreadsheet ID if found, otherwise null.
      */
-    suspend fun deleteRow(
-        spreadsheetId: String,
-        sheetId: Int,
-        rowNumber: Int,
-    ) {
-        return withContext(Dispatchers.IO) {
-            try {
-                val sheetsService = getAuthorizedSheetsService()
+    suspend fun searchForSheet(name: String): String? = withContext(Dispatchers.IO) {
+        // Escape single quotes in the name to prevent query errors.
+        val sanitizedName = name.replace("'", "\\'")
+        val query = "name = '$sanitizedName' and mimeType = 'application/vnd.google-apps.spreadsheet'"
 
-                // Rows are 0-indexed in the API, so adjust the 1-based rowNumber
-                val startIndex = rowNumber - 1
-                val endIndex = rowNumber // Delete only one row
-
-                val deleteRequest = DeleteDimensionRequest()
-                    .setRange(
-                        DimensionRange()
-                            .setSheetId(sheetId)
-                            .setDimension("ROWS")
-                            .setStartIndex(startIndex)
-                            .setEndIndex(endIndex)
-                    )
-
-                val request = Request().setDeleteDimension(deleteRequest)
-                val batchUpdateRequest = BatchUpdateSpreadsheetRequest()
-                    .setRequests(listOf(request))
-
-                sheetsService.spreadsheets()
-                    .batchUpdate(spreadsheetId, batchUpdateRequest)
-                    .execute()
-
-                Log.d(
-                    TAG,
-                    "Row $rowNumber deleted successfully from sheet $sheetId in spreadsheet $spreadsheetId"
-                )
-            } catch (e: AuthorizationRequiredException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e(TAG, "Error deleting row: ${e.message}", e)
-                throw e
-            }
+        try {
+            val files = getDriveService().files().list()
+                .setQ(query)
+                .setSpaces("drive")
+                .setFields("files(id)")
+                .execute()
+            files.files.firstOrNull()?.id
+        } catch (e: Exception) {
+            Log.e(TAG, "Error searching for sheet", e)
+            throw e // Propagate error to caller
         }
     }
 
-
-    companion object {
-        // CLIENT_ID is now accessed via BuildConfig.GOOGLE_SHEETS_CLIENT_ID
-        // Ensure it's set up in local.properties and build.gradle.kts
+    /**
+     * Lists all spreadsheets accessible to the user.
+     * @return A list of Drive File objects.
+     */
+    suspend fun listSpreadsheets(): List<com.google.api.services.drive.model.File> = withContext(Dispatchers.IO) {
+        try {
+            getDriveService().files().list()
+                .setQ("mimeType = 'application/vnd.google-apps.spreadsheet'")
+                .setSpaces("drive")
+                .setFields("files(id, name)")
+                .execute()
+                .files ?: emptyList()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error listing spreadsheets", e)
+            throw e
+        }
     }
 
     /**
-     * Custom exception to signal that user authorization UI needs to be shown.
+     * Appends a new row to the specified spreadsheet.
      */
-    class AuthorizationRequiredException(
-        message: String = "User authorization required.",
-        val pendingIntent: PendingIntent? = null // Now includes the PendingIntent
-    ) : Exception(message)
+    suspend fun addData(fuelEntry: FuelEntry, spreadsheetId: String, range: String) = withContext(Dispatchers.IO) {
+        try {
+            val rowData = listOf(
+                listOf(fuelEntry.date.toString(), fuelEntry.gallons, fuelEntry.miles, fuelEntry.cost)
+            )
+            val body = ValueRange().setValues(rowData)
+
+            getSheetsService().spreadsheets().values()
+                .append(spreadsheetId, range, body)
+                .setValueInputOption("USER_ENTERED")
+                .execute()
+
+            Log.d(TAG, "Data added successfully to spreadsheet $spreadsheetId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error adding data to spreadsheet", e)
+            throw e
+        }
+    }
+
+    /**
+     * Deletes a specific row from a spreadsheet.
+     */
+    suspend fun deleteRow(spreadsheetId: String, sheetId: Int, rowNumber: Int) = withContext(Dispatchers.IO) {
+        try {
+            val deleteRequest = DeleteDimensionRequest().setRange(
+                DimensionRange()
+                    .setSheetId(sheetId)
+                    .setDimension("ROWS")
+                    .setStartIndex(rowNumber - 1) // API is 0-indexed
+                    .setEndIndex(rowNumber)
+            )
+
+            val batchUpdateRequest = BatchUpdateSpreadsheetRequest()
+                .setRequests(listOf(Request().setDeleteDimension(deleteRequest)))
+
+            getSheetsService().spreadsheets()
+                .batchUpdate(spreadsheetId, batchUpdateRequest)
+                .execute()
+
+            Log.d(TAG, "Row $rowNumber deleted successfully from sheet $sheetId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting row", e)
+            throw e
+        }
+    }
+
+    /**
+     * Gets spreadsheet details from a selected URI
+     * @param uri The URI returned from the file picker
+     * @return SelectedSpreadsheet object with ID and name, or null if unable to process
+     */
+    suspend fun getSpreadsheetFromUri(uri: Uri): SelectedSpreadsheet? = withContext(Dispatchers.IO) {
+        try {
+            // Extract the file ID from the URI
+            getFileNameFromUri(context, uri)?.let { filename ->
+                searchForSheetByExactName(filename)?.let { sheetId ->
+                    SelectedSpreadsheet(sheetId, filename, uri)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting spreadsheet from URI", e)
+            null
+        }
+    }
+
+    /**
+     * Method 3: Search for spreadsheet by exact name match
+     * This is more reliable when dealing with content URIs
+     */
+    suspend fun searchForSheetByExactName(name: String): String? = withContext(Dispatchers.IO) {
+        try {
+            // Remove file extension if present
+            val cleanName = name.replace(".gsheet", "").replace(".pdf", "").trim()
+
+            // Search for the exact spreadsheet name
+            val files = getDriveService().files().list()
+                .setQ("name = '${cleanName.replace("'", "\\'")}' and mimeType = 'application/vnd.google-apps.spreadsheet'")
+                .setSpaces("drive")
+                .setFields("files(id, name)")
+                .execute()
+
+            // Return the first matching file
+            files.files.firstOrNull()?.id
+        } catch (e: Exception) {
+            Log.e(TAG, "Error searching for sheet by name: $name", e)
+            null
+        }
+    }
+
+    /**
+     * Verifies that the user has access to a specific spreadsheet
+     * @param spreadsheetId The ID of the spreadsheet to verify
+     * @return true if accessible, false otherwise
+     */
+    suspend fun verifySpreadsheetAccess(spreadsheetId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            getSheetsService().spreadsheets().get(spreadsheetId)
+                .setFields("spreadsheetId")
+                .execute()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Cannot access spreadsheet with ID: $spreadsheetId", e)
+            false
+        }
+    }
+
+    /**
+     * Gets spreadsheet metadata including sheet names and IDs
+     */
+    suspend fun getSpreadsheetMetadata(spreadsheetId: String) = withContext(Dispatchers.IO) {
+        try {
+            val spreadsheet = getSheetsService().spreadsheets().get(spreadsheetId).execute()
+            spreadsheet.sheets.map { sheet ->
+                SheetInfo(
+                    sheetId = sheet.properties.sheetId,
+                    title = sheet.properties.title
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting spreadsheet metadata", e)
+            throw e
+        }
+    }
 }

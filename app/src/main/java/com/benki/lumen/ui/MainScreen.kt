@@ -56,11 +56,11 @@ fun EntryRow(entry: FuelEntry, viewModel: FuelViewModel) {
             }
         }
         if (entry.status == FuelEntry.Status.ERROR) {
-            IconButton(onClick = { viewModel.retry(entry.id) }) {
+            IconButton(onClick = { viewModel.retryLastOperation() }) {
                 Icon(Icons.Default.Refresh, contentDescription = "Retry")
             }
         }
-        IconButton(onClick = { viewModel.delete(entry.id) }) {
+        IconButton(onClick = { viewModel.deleteFuelEntry(entry.id, 0, 0) }) {
             Icon(Icons.Default.Delete, contentDescription = "Delete")
         }
     }

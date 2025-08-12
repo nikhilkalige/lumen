@@ -1,176 +1,111 @@
-<!--
-Copyright 2018 Google LLC
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    https://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
--->
-<!-- [START picker_hello_world] -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Picker API Quickstart</title>
-  <meta charset="utf-8" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google API Key Tester</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .status-box {
+            transition: all 0.3s ease-in-out;
+        }
+    </style>
 </head>
-<body>
-<p>Picker API API Quickstart</p>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
 
-<!--Add buttons to initiate auth sequence and sign out-->
-<button id="authorize_button" onclick="handleAuthClick()">Authorize</button>
-<button id="signout_button" onclick="handleSignoutClick()">Sign Out</button>
+    <div class="bg-white p-8 rounded-xl shadow-2xl max-w-2xl w-full">
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Google API Key Tester</h1>
+        <p class="text-gray-600 mb-6">
+            Use this tool to verify if your Google API Key is valid and configured correctly.
+            This test uses the <a href="https://developers.google.com/books" target="_blank" class="text-blue-600 hover:underline">Google Books API</a>.
+        </p>
 
-<pre id="content" style="white-space: pre-wrap;"></pre>
+        <div class="mb-6">
+            <label for="apiKey" class="block text-sm font-medium text-gray-700 mb-2">Your Google API Key:</label>
+            <input type="text" id="apiKey" name="apiKey" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Paste your API Key here">
+        </div>
 
-<script type="text/javascript">
-  /* exported gapiLoaded */
-  /* exported gisLoaded */
-  /* exported handleAuthClick */
-  /* exported handleSignoutClick */
+        <button id="testButton" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-101 focus:outline-none focus:ring-4 focus:ring-blue-300">
+            Test API Key
+        </button>
 
-  // Authorization scopes required by the API; multiple scopes can be
-  // included, separated by spaces.
-  const SCOPES = 'https://www.googleapis.com/auth/drive.metadata.readonly';
+        <!-- Status display area -->
+        <div id="status" class="status-box mt-6 p-4 rounded-lg text-center hidden">
+            <p id="statusMessage" class="font-semibold"></p>
+            <pre id="errorDetails" class="mt-2 text-left text-xs bg-gray-800 text-white p-3 rounded-md overflow-x-auto"></pre>
+        </div>
 
-  // TODO(developer): Set to client ID and API key from the Developer Console
-  const CLIENT_ID = '514662388249-vvsn1murij0pknum1njs3bn6o642r4b8.apps.googleusercontent.com';
-  const API_KEY = '<YOUR_API_KEY>';
+        <div class="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+             <h2 class="text-lg font-semibold text-gray-700 mb-2">Instructions</h2>
+             <ol class="list-decimal list-inside text-gray-600 space-y-2">
+                <li>Go to your <a href="https://console.cloud.google.com/apis/library" target="_blank" class="text-blue-600 hover:underline">Google Cloud Console API Library</a>.</li>
+                <li>Search for and **enable the "Google Books API"** for your project. Your key won't work without this step.</li>
+                <li>Go to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="text-blue-600 hover:underline">Credentials page</a> and copy your API Key.</li>
+                <li>Paste the key into the input box above and click the "Test API Key" button.</li>
+             </ol>
+        </div>
+    </div>
 
-  // TODO(developer): Replace with your own project number from console.developers.google.com.
-  const APP_ID = 'lumen';
+    <script>
+        const apiKeyInput = document.getElementById('apiKey');
+        const testButton = document.getElementById('testButton');
+        const statusDiv = document.getElementById('status');
+        const statusMessage = document.getElementById('statusMessage');
+        const errorDetails = document.getElementById('errorDetails');
 
-  let tokenClient;
-  let accessToken = null;
-  let pickerInited = false;
-  let gisInited = false;
+        testButton.addEventListener('click', async () => {
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) {
+                alert('Please enter an API Key.');
+                return;
+            }
 
+            // Reset status
+            statusDiv.classList.add('hidden');
+            statusMessage.textContent = '';
+            errorDetails.textContent = '';
+            testButton.disabled = true;
+            testButton.textContent = 'Testing...';
 
-  document.getElementById('authorize_button').style.visibility = 'hidden';
-  document.getElementById('signout_button').style.visibility = 'hidden';
+            // We will make a simple search request to the Google Books API
+            const testApiUrl = `https://www.googleapis.com/books/v1/volumes?q=javascript&key=${apiKey}`;
 
-  /**
-   * Callback after api.js is loaded.
-   */
-  function gapiLoaded() {
-    gapi.load('client:picker', initializePicker);
-  }
+            try {
+                const response = await fetch(testApiUrl);
+                const data = await response.json();
 
-  /**
-   * Callback after the API client is loaded. Loads the
-   * discovery doc to initialize the API.
-   */
-  async function initializePicker() {
-    await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
-    pickerInited = true;
-    maybeEnableButtons();
-  }
+                if (response.ok) {
+                    // --- SUCCESS ---
+                    statusDiv.classList.remove('hidden', 'bg-red-100', 'text-red-800');
+                    statusDiv.classList.add('bg-green-100', 'text-green-800');
+                    statusMessage.textContent = '✅ Success! Your API Key is valid.';
+                    errorDetails.textContent = `Successfully fetched ${data.items.length} books.`;
+                } else {
+                    // --- FAILURE ---
+                    // The API returned an error, which means the key is likely invalid or restricted.
+                    showError('❌ Error! The API Key is invalid or restricted.', data);
+                }
+            } catch (error) {
+                // Network error or other fetch-related issue
+                showError('❌ Network Error! Could not connect to the API.', { error: { message: error.message } });
+            } finally {
+                testButton.disabled = false;
+                testButton.textContent = 'Test API Key';
+            }
+        });
 
-  /**
-   * Callback after Google Identity Services are loaded.
-   */
-  function gisLoaded() {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
-      scope: SCOPES,
-      callback: '', // defined later
-    });
-    gisInited = true;
-    maybeEnableButtons();
-  }
+        function showError(message, data) {
+            statusDiv.classList.remove('hidden', 'bg-green-100', 'text-green-800');
+            statusDiv.classList.add('bg-red-100', 'text-red-800');
+            statusMessage.textContent = message;
+            // Display the detailed error message from Google's API response
+            errorDetails.textContent = JSON.stringify(data.error, null, 2);
+        }
+    </script>
 
-  /**
-   * Enables user interaction after all libraries are loaded.
-   */
-  function maybeEnableButtons() {
-    if (pickerInited && gisInited) {
-      document.getElementById('authorize_button').style.visibility = 'visible';
-    }
-  }
-
-  /**
-   *  Sign in the user upon button click.
-   */
-  function handleAuthClick() {
-    tokenClient.callback = async (response) => {
-      if (response.error !== undefined) {
-        throw (response);
-      }
-      accessToken = response.access_token;
-      document.getElementById('signout_button').style.visibility = 'visible';
-      document.getElementById('authorize_button').innerText = 'Refresh';
-      await createPicker();
-    };
-
-    if (accessToken === null) {
-      // Prompt the user to select a Google Account and ask for consent to share their data
-      // when establishing a new session.
-      tokenClient.requestAccessToken({prompt: 'consent'});
-    } else {
-      // Skip display of account chooser and consent dialog for an existing session.
-      tokenClient.requestAccessToken({prompt: ''});
-    }
-  }
-
-  /**
-   *  Sign out the user upon button click.
-   */
-  function handleSignoutClick() {
-    if (accessToken) {
-      google.accounts.oauth2.revoke(accessToken);
-      accessToken = null;
-      document.getElementById('content').innerText = '';
-      document.getElementById('authorize_button').innerText = 'Authorize';
-      document.getElementById('signout_button').style.visibility = 'hidden';
-    }
-  }
-
-  /**
-   *  Create and render a Picker object for searching images.
-   */
-  function createPicker() {
-    const view = new google.picker.View(google.picker.ViewId.DOCS);
-    view.setMimeTypes('image/png,image/jpeg,image/jpg');
-    const picker = new google.picker.PickerBuilder()
-        .enableFeature(google.picker.Feature.NAV_HIDDEN)
-        .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-        .setDeveloperKey(API_KEY)
-        .setAppId(APP_ID)
-        .setOAuthToken(accessToken)
-        .addView(view)
-        .addView(new google.picker.DocsUploadView())
-        .setCallback(pickerCallback)
-        .build();
-    picker.setVisible(true);
-  }
-
-  /**
-   * Displays the file details of the user's selection.
-   * @param {object} data - Containers the user selection from the picker
-   */
-  async function pickerCallback(data) {
-    if (data.action === google.picker.Action.PICKED) {
-      let text = `Picker response: \n${JSON.stringify(data, null, 2)}\n`;
-      const document = data[google.picker.Response.DOCUMENTS][0];
-      const fileId = document[google.picker.Document.ID];
-      console.log(fileId);
-      const res = await gapi.client.drive.files.get({
-        'fileId': fileId,
-        'fields': '*',
-      });
-      text += `Drive API response for first document: \n${JSON.stringify(res.result, null, 2)}\n`;
-      window.document.getElementById('content').innerText = text;
-    }
-  }
-</script>
-<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 </body>
 </html>
-<!-- [END picker_hello_world] -->

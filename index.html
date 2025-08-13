@@ -1,111 +1,215 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google API Key Tester</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .status-box {
-            transition: all 0.3s ease-in-out;
-        }
-    </style>
+  <title>Google Picker to Android App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+  <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+  <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
 
-    <div class="bg-white p-8 rounded-xl shadow-2xl max-w-2xl w-full">
-        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Google API Key Tester</h1>
-        <p class="text-gray-600 mb-6">
-            Use this tool to verify if your Google API Key is valid and configured correctly.
-            This test uses the <a href="https://developers.google.com/books" target="_blank" class="text-blue-600 hover:underline">Google Books API</a>.
-        </p>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
 
-        <div class="mb-6">
-            <label for="apiKey" class="block text-sm font-medium text-gray-700 mb-2">Your Google API Key:</label>
-            <input type="text" id="apiKey" name="apiKey" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Paste your API Key here">
-        </div>
+  <div class="bg-white p-8 md:p-12 rounded-xl shadow-2xl max-w-lg w-full text-center">
+    <h1 class="text-3xl font-bold text-gray-800 mb-4">File Picker for Android</h1>
+    <p class="text-gray-600 mb-8">
+      Click the button below to sign in with Google and select a file from your Drive. A special link will be generated
+      to open the selected file in your Android app.
+    </p>
 
-        <button id="testButton" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-101 focus:outline-none focus:ring-4 focus:ring-blue-300">
-            Test API Key
-        </button>
+    <!-- Button to trigger the authentication and file picker -->
+    <button id="auth-button" onclick="handleAuthClick()"
+      class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:bg-gray-400 disabled:cursor-not-allowed w-full">
+      Authorize and Select File
+    </button>
 
-        <!-- Status display area -->
-        <div id="status" class="status-box mt-6 p-4 rounded-lg text-center hidden">
-            <p id="statusMessage" class="font-semibold"></p>
-            <pre id="errorDetails" class="mt-2 text-left text-xs bg-gray-800 text-white p-3 rounded-md overflow-x-auto"></pre>
-        </div>
-
-        <div class="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-             <h2 class="text-lg font-semibold text-gray-700 mb-2">Instructions</h2>
-             <ol class="list-decimal list-inside text-gray-600 space-y-2">
-                <li>Go to your <a href="https://console.cloud.google.com/apis/library" target="_blank" class="text-blue-600 hover:underline">Google Cloud Console API Library</a>.</li>
-                <li>Search for and **enable the "Google Books API"** for your project. Your key won't work without this step.</li>
-                <li>Go to the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="text-blue-600 hover:underline">Credentials page</a> and copy your API Key.</li>
-                <li>Paste the key into the input box above and click the "Test API Key" button.</li>
-             </ol>
-        </div>
+    <!-- This div will display the link to open the Android app -->
+    <div id="result" class="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200 text-left hidden">
+      <h2 class="text-lg font-semibold text-gray-700 mb-2">Success!</h2>
+      <p class="text-gray-600 mb-4">Click the link below to open the file in your app:</p>
+      <a id="android-app-link" href="#"
+        class="text-blue-600 hover:text-blue-800 break-all font-mono bg-gray-100 p-2 rounded-md block"></a>
+      <p class="text-xs text-gray-500 mt-4">Note: This will only work if your Android app is installed and configured to
+        handle this type of link.</p>
     </div>
 
-    <script>
-        const apiKeyInput = document.getElementById('apiKey');
-        const testButton = document.getElementById('testButton');
-        const statusDiv = document.getElementById('status');
-        const statusMessage = document.getElementById('statusMessage');
-        const errorDetails = document.getElementById('errorDetails');
+    <!-- Message box for errors or status updates -->
+    <div id="message-box" class="mt-6 p-3 bg-red-100 text-red-700 rounded-lg border border-red-200 hidden"></div>
+  </div>
 
-        testButton.addEventListener('click', async () => {
-            const apiKey = apiKeyInput.value.trim();
-            if (!apiKey) {
-                alert('Please enter an API Key.');
-                return;
-            }
+  <script type="text/javascript">
+    // =======================================================================
+    // IMPORTANT: REPLACE WITH YOUR OWN CREDENTIALS AND APP DETAILS
+    // =======================================================================
+    // You can get these from the Google Cloud Console: https://console.cloud.google.com/
+    const CLIENT_ID = '514662388249-vvsn1murij0pknum1njs3bn6o642r4b8.apps.googleusercontent.com';
+    const API_KEY = 'AIzaSyCGYQ0HKfDtGTHlyJk5_pTh3uZAdjsnPgg';
+    const APP_ID = '514662388249';
 
-            // Reset status
-            statusDiv.classList.add('hidden');
-            statusMessage.textContent = '';
-            errorDetails.textContent = '';
-            testButton.disabled = true;
-            testButton.textContent = 'Testing...';
+    // Details for your Android app's intent filter
+    const ANDROID_APP_PACKAGE = 'com.benki.lumen';
+    const ANDROID_APP_SCHEME = 'lumen';
+    // =======================================================================
 
-            // We will make a simple search request to the Google Books API
-            const testApiUrl = `https://www.googleapis.com/books/v1/volumes?q=javascript&key=${apiKey}`;
 
-            try {
-                const response = await fetch(testApiUrl);
-                const data = await response.json();
+    // The scope for read-only access to Google Drive files.
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
-                if (response.ok) {
-                    // --- SUCCESS ---
-                    statusDiv.classList.remove('hidden', 'bg-red-100', 'text-red-800');
-                    statusDiv.classList.add('bg-green-100', 'text-green-800');
-                    statusMessage.textContent = '✅ Success! Your API Key is valid.';
-                    errorDetails.textContent = `Successfully fetched ${data.items.length} books.`;
-                } else {
-                    // --- FAILURE ---
-                    // The API returned an error, which means the key is likely invalid or restricted.
-                    showError('❌ Error! The API Key is invalid or restricted.', data);
-                }
-            } catch (error) {
-                // Network error or other fetch-related issue
-                showError('❌ Network Error! Could not connect to the API.', { error: { message: error.message } });
-            } finally {
-                testButton.disabled = false;
-                testButton.textContent = 'Test API Key';
-            }
+    let tokenClient;
+    let accessToken = null;
+    let pickerApiLoaded = false;
+    let gapiInited = false;
+    let gsiInited = false;
+
+    const authButton = document.getElementById('auth-button');
+    const resultDiv = document.getElementById('result');
+    const appLink = document.getElementById('android-app-link');
+    const messageBox = document.getElementById('message-box');
+
+    /**
+     * Callback after the Google Identity Services (GIS) library is loaded.
+     */
+    function gisLoaded() {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: (tokenResponse) => {
+          accessToken = tokenResponse.access_token;
+          // Now that we have a token, create and show the picker
+          createPicker();
+        },
+      });
+      gsiInited = true;
+      checkReadyState();
+    }
+
+    /**
+     * Callback after the Google API client library is loaded.
+     */
+    function gapiLoaded() {
+      gapi.load('client:picker', () => {
+        gapi.client.init({}).then(() => {
+          pickerApiLoaded = true;
+          gapiInited = true;
+          checkReadyState();
         });
+      });
+    }
 
-        function showError(message, data) {
-            statusDiv.classList.remove('hidden', 'bg-green-100', 'text-green-800');
-            statusDiv.classList.add('bg-red-100', 'text-red-800');
-            statusMessage.textContent = message;
-            // Display the detailed error message from Google's API response
-            errorDetails.textContent = JSON.stringify(data.error, null, 2);
-        }
-    </script>
+    /**
+     * Checks if both API libraries are loaded and ready.
+     */
+    function checkReadyState() {
+      if (gsiInited && gapiInited) {
+        authButton.disabled = false;
+      } else {
+        authButton.disabled = true;
+        authButton.textContent = 'APIs Loading...';
+      }
+    }
+
+    /**
+     * Called when the user clicks the auth button. It requests an access token.
+     */
+    function handleAuthClick() {
+      if (accessToken) {
+        // If we already have a token, just show the picker
+        createPicker();
+      } else {
+        // Otherwise, request a token. The callback will handle creating the picker.
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+      }
+    }
+
+    /**
+     * Creates and displays the Google Picker.
+     */
+    function createPicker() {
+      if (!pickerApiLoaded || !accessToken) {
+        showMessage('Picker API not loaded or user not authenticated.', 'error');
+        return;
+      }
+
+      const mimeTypes = ['application/vnd.google-apps.document'];
+      const view = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+        .setOwnedByMe(true);
+
+      const picker = new google.picker.PickerBuilder()
+        .setAppId(APP_ID)
+        .setOAuthToken(accessToken)
+        .setDeveloperKey(API_KEY)
+        .addView(view)
+        .setSelectableMimeTypes(mimeTypes.join(","))
+        .setCallback(pickerCallback)
+        .build();
+
+      picker.setVisible(true);
+    }
+
+    /**
+     * The callback function that is executed when a user selects a file in the picker.
+     * @param {object} data - The data returned from the picker.
+     */
+    function pickerCallback(data) {
+      if (data.action === google.picker.Action.PICKED) {
+        const doc = data.docs[0];
+        const fileId = doc.id;
+        const fileName = doc.name;
+        const mimeType = doc.mimeType;
+
+        // Construct the Android Intent URI
+        // This is a special format that Android can understand.
+        // It tells Android to open an app with a specific package name and pass data to it.
+        // In your Android app's manifest, you'll need an <intent-filter> to catch this.
+        // Example Intent Filter in AndroidManifest.xml:
+        // <intent-filter>
+        //     <action android:name="android.intent.action.VIEW" />
+        //     <category android:name="android.intent.category.DEFAULT" />
+        //     <category android:name="android.intent.category.BROWSABLE" />
+        //     <data android:scheme="yourappscheme" />
+        // </intent-filter>
+        const intentURI =
+          `intent://picker-result/#Intent;` +
+          `scheme=${ANDROID_APP_SCHEME};` +
+          `package=${ANDROID_APP_PACKAGE};` +
+          `S.fileId=${encodeURIComponent(fileId)};` +
+          `S.fileName=${encodeURIComponent(fileName)};` +
+          `S.mimeType=${encodeURIComponent(mimeType)};` +
+          `end`;
+
+        // Display the link to the user
+        appLink.href = intentURI;
+        appLink.textContent = `Open "${fileName}" in App`;
+        resultDiv.classList.remove('hidden');
+        messageBox.classList.add('hidden'); // Hide any previous error messages
+      } else if (data.action === google.picker.Action.CANCEL) {
+        showMessage('File selection was cancelled.', 'info');
+      }
+    }
+
+    /**
+     * Helper function to display messages to the user.
+     * @param {string} text - The message to display.
+     * @param {string} type - 'error' or 'info'.
+     */
+    function showMessage(text, type = 'error') {
+      messageBox.textContent = text;
+      messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'border-red-200', 'bg-blue-100', 'text-blue-700', 'border-blue-200');
+      if (type === 'error') {
+        messageBox.classList.add('bg-red-100', 'text-red-700', 'border-red-200');
+      } else {
+        messageBox.classList.add('bg-blue-100', 'text-blue-700', 'border-blue-200');
+      }
+    }
+  </script>
 
 </body>
+
 </html>

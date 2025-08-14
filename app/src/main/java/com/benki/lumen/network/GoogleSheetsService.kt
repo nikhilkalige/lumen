@@ -2,7 +2,6 @@ package com.benki.lumen.network
 
 import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
@@ -46,68 +45,6 @@ data class SelectedSpreadsheet(
     val uri: Uri
 )
 
-// Add these methods to your GoogleSheetsService class:
-
-/**
- * Creates an intent to open Google Drive's file picker for spreadsheet selection.
- * This should be launched using an ActivityResultLauncher.
- */
-fun createFilePickerIntent(): Intent {
-    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-        // addCategory(Intent.CATEGORY_OPENABLE)
-        type = "application/vnd.google-apps.spreadsheet"
-        putExtra(
-            Intent.EXTRA_MIME_TYPES, arrayOf(
-                "application/vnd.google-apps.spreadsheet"
-            )
-        )
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-
-        // This ensures we're using Google Drive
-        // putExtra("android.provider.extra.SHOW_ADVANCED", true)
-        // putExtra("android.content.extra.SHOW_ADVANCED", true)
-    }
-    return intent
-}
-
-/**
- * Alternative method using Google Drive's picker (requires additional setup)
- * This creates an intent to open Google Drive's native picker
- */
-fun createDrivePickerIntentx(): Intent {
-    return Intent(Intent.ACTION_GET_CONTENT).apply {
-        type = "application/vnd.google-apps.spreadsheet"
-        addCategory(Intent.CATEGORY_OPENABLE)
-        putExtra(Intent.EXTRA_LOCAL_ONLY, false)
-        // Force Google Drive to handle this
-        setPackage("com.google.android.apps.docs")
-    }
-}
-
-fun createDrivePickerIntent(): Intent {
-    return Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-        type = "*/*"
-        putExtra(
-            Intent.EXTRA_MIME_TYPES, arrayOf(
-                "application/vnd.google-apps.spreadsheet"
-            )
-        )
-        // These flags are crucial for write permissions
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-        addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-//        type = "application/vnd.google-apps.spreadsheet"
-//
-//        // These flags are crucial for write permissions
-//        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-//        addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-//        addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-//
-//        // Optional: Try to prefer Google Drive, but don't force it
-//        setPackage("com.google.android.apps.docs")
-    }
-}
 
 /**
  * Helper method to extract file ID from content URI using content resolver
@@ -120,37 +57,6 @@ private fun extractIdFromContentUri(uri: Uri): String? {
     } catch (e: Exception) {
         Log.e(TAG, "Could not extract ID from content URI", e)
         null
-    }
-}
-
-/**
- * Extracts Google Drive file ID from various URI formats
- */
-private fun extractFileIdFromUri(uri: Uri): String? {
-    // Handle different URI formats
-    return when {
-        // Direct Google Drive URI
-        uri.toString().contains("drive.google.com") -> {
-            // Extract ID from URL like: https://drive.google.com/file/d/FILE_ID/...
-            val pattern = "/d/([a-zA-Z0-9-_]+)".toRegex()
-            pattern.find(uri.toString())?.groupValues?.get(1)
-        }
-        // Content URI from picker
-        uri.scheme == "content" -> {
-            // For content URIs, we might need to query the content resolver
-            // or parse the last path segment
-            uri.lastPathSegment?.let { segment ->
-                // Sometimes the ID is in the last segment
-                if (segment.matches("[a-zA-Z0-9-_]+".toRegex())) {
-                    segment
-                } else {
-                    // Try to extract from the full path
-                    extractIdFromContentUri(uri)
-                }
-            }
-        }
-
-        else -> null
     }
 }
 
@@ -169,13 +75,6 @@ private fun getFileNameFromUri(context: Context, uri: Uri): String? {
     // Return null if the query fails or the column doesn't exist.
     return null
 }
-
-
-// Data class for sheet information
-data class SheetInfo(
-    val sheetId: Int,
-    val title: String
-)
 
 
 /**
@@ -279,21 +178,6 @@ class GoogleSheetsService @Inject constructor(private val context: Context) {
                 .build().also { driveService = it }
         }
     }
-
-    /**
-     * Signs the user out and clears all cached credentials and service clients.
-     */
-//    suspend fun signOut() = serviceMutex.withLock {
-//        try {
-//            authorizationClient.signOut().await()
-//        } catch (e: Exception) {
-//            Log.e(TAG, "Sign out failed", e)
-//        } finally {
-//            // Clear cached services regardless of sign-out success
-//            sheetsService = null
-//            driveService = null
-//        }
-//    }
 
     /**
      * Fetches the email address of the signed-in user.

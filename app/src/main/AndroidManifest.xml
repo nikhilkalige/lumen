@@ -26,7 +26,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="lumen" android:pathPrefix="/" android:host="gas"/>
+                <data android:scheme="lumen" android:host="gas"/>
             </intent-filter>
 
             <intent-filter>
@@ -40,6 +40,16 @@
             </intent-filter>
 
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts"/>
+
+<!--            <service-->
+<!--                android:name=".FuelEntryWidgetReceiver"-->
+<!--                android:enabled="true"-->
+<!--                android:exported="true">-->
+<!--                <intent-filter>-->
+<!--                    <action-->
+<!--                        android:name="com.google.assistant.appactions.widgets.PIN_APP_WIDGET" />-->
+<!--                </intent-filter>-->
+<!--            </service>-->
         </activity>
 
     </application>

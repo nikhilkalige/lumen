@@ -19,13 +19,20 @@
 
     <!-- Query patterns for adding gas entry custom intent -->
     <string-array name="addGasEntryQueries">
-        <!-- <item>add gas entry</item> -->
+        <!-- Odometer First -->
+        <item>gas entry $odometer miles $gallons gallons for $cost dollars</item>
+        <item>gas entry $odometer miles for $cost dollars I got $gallons gallons</item>
 
-        <item>add gas entry $odometer miles $gallons gallons $cost dollars</item>
-        <item>add gas entry $odometer miles $gallons liters $cost dollars</item>
+        <!-- Gallons First -->
+        <item>gas entry $gallons gallons $odometer miles for $cost dollars</item>
+        <item>gas entry $gallons gallons for $cost dollars at $odometer miles</item>
 
-        <!--        <item>add gas entry $date</item>-->
-        <!-- <item>log gas $odometer $gallons gallons $cost</item> -->
-        <!-- <item>record gas $odometer $gallons gallons $cost</item> -->
+        <!-- Cost First -->
+        <item>gas entry for $cost dollars $gallons gallons at $odometer miles</item>
+        <item>gas entry for $cost dollars at $odometer miles I got $gallons gallons</item>
+
+        <!-- Alternative Keywords -->
+        <item>fuel log $odometer miles $gallons gallons for $cost dollars</item>
+        <item>fuel log $gallons gallons for $cost dollars at $odometer miles</item>
     </string-array>
 </resources>

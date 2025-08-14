@@ -1,44 +1,57 @@
 package com.benki.lumen.ui
 
-import android.app.Activity
 import android.content.Intent
-import android.net.Uri
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavController
-import com.benki.lumen.network.SelectedSpreadsheet
-import com.benki.lumen.network.createDrivePickerIntent
-import com.benki.lumen.network.createFilePickerIntent
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.CloudOff // Correct import
-import androidx.compose.material.icons.filled.Description // Correct import
-import androidx.compose.material.icons.filled.LinkOff // Correct import
-import androidx.compose.material.icons.filled.Login // Correct import
-import androidx.compose.material.icons.filled.Logout // Correct import
-import androidx.compose.material.icons.filled.Person // Correct import
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import com.benki.lumen.PickerActivity
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
 
 @Composable
 fun SettingsScreen(
@@ -53,22 +66,6 @@ fun SettingsScreen(
         contract = ActivityResultContracts.StartIntentSenderForResult(),
         onResult = { viewModel.signIn() } // Retry sign-in after auth intent returns
     )
-
-    // Launcher for file picker
-    val sheetPickerLauncher = rememberLauncherForActivityResult(
-       contract = ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            // The user selected a file. Get the Uri and pass it to the ViewModel.
-            result.data?.data?.let { uri ->
-                 viewModel.onSheetSelectedFromPicker(uri)
-                //context.contentResolver.takePersistableUriPermission(
-                 //   uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                //)
-            //    //iewModel.onSheetPicked(uri)
-            }
-
-    }}
 
     // --- EFFECT TO LAUNCH THE PICKER ---
     LaunchedEffect(uiState.launchSheetPicker) {
@@ -92,74 +89,10 @@ fun SettingsScreen(
         onSignInClick = viewModel::signIn,
         onSignOutClick = viewModel::signOut,
         onSelectSheetClick = viewModel::onSelectSheetClicked,
-        //onSheetSelected = viewModel::onSheetSelected,
-        //onDismissSheetPicker = viewModel::dismissSheetPicker,
         onBackClick = { navController.popBackStack() }
     )
 }
 
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SettingsScreenContentX(
-    uiState: SettingsUiState,
-    onSignInClick: () -> Unit,
-    onSignOutClick: () -> Unit,
-    onSelectSheetClick: () -> Unit,
-    onBackClick: () -> Unit
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(it)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            if (uiState.isLoading) {
-                CircularProgressIndicator()
-            }
-            if (uiState.isLoggedIn) {
-                Text("Signed in as: ${uiState.userEmail}")
-                Spacer(modifier = Modifier.height(16.dp))
-                if (uiState.selectedSheetId != null) {
-                    Text("Selected Sheet: ${uiState.selectedSheetName}  [${uiState.selectedSheetId}]")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = onSelectSheetClick) {
-                        Text("Change Spreadsheet")
-                    }
-                } else {
-                    Button(onClick = onSelectSheetClick) {
-                        Text("Select Spreadsheet")
-                    }
-                }
-                Spacer(modifier = Modifier.height(32.dp))
-                Button(onClick = onSignOutClick) {
-                    Text("Sign Out")
-                }
-            } else {
-                Text("Sign in with your Google Account to sync your fuel entries.")
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = onSignInClick) {
-                    Text("Sign In with Google")
-                }
-            }
-        }
-    }
-
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -362,29 +295,6 @@ private fun SettingsRow(
         }
     }
 }
-
-//@Composable
-//fun SpreadsheetPickerDialog(
-//    spreadsheets: List<com.google.api.services.drive.model.File>,
-//    onDismiss: () -> Unit,
-//    onSheetSelected: (SelectedSpreadsheet) -> Unit
-//) {
-//    AlertDialog(
-//        onDismissRequest = onDismiss,
-//        title = { Text("Select a Spreadsheet") },
-//        text = {
-//            LazyColumn {
-//                items(spreadsheets) { sheet ->
-//                    ListItem(
-//                        headlineContent = { Text(sheet.name) },
-//                        modifier = Modifier.clickable { onSheetSelected(sheet) }
-//                    )
-//                }
-//            }
-//        },
-//        confirmButton = { }
-//    )
-//}
 
 @Preview(showBackground = true)
 @Composable

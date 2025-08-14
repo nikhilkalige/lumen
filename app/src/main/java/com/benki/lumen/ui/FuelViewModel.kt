@@ -132,41 +132,29 @@ class FuelViewModel @Inject constructor(
 
     private fun performOperation(operation: FuelOperation) {
         if (currentJob?.isActive == true) {
-            Log.w("FuelViewModel", "Operation already in progress. Ignoring duplicate request.")
             return
         }
 
         currentJob = viewModelScope.launch {
             emitLoading(true)
             try {
-                Log.d("FuelViewModel", "VM Step 1: Calling repository...")
                 when (operation) {
                     is FuelOperation.Add -> fuelRepository.addEntry(operation.entry)
                     is FuelOperation.Delete -> fuelRepository.delete(operation.entry.id)
                 }
-                Log.i("FuelViewModel", "VM Step 2: Repository call successful.")
 
                 // --- Granular logging for the success path ---
-                Log.d("FuelViewModel", "VM Step 3: Setting lastFailedOperation to null.")
                 lastFailedOperation = null
-
-                Log.d("FuelViewModel", "VM Step 4: Emitting DataSynced event.")
                 emitEvent(UiEvent.DataSynced)
-
-                Log.d("FuelViewModel", "VM Step 5: Emitting ShowMessage event.")
                 emitEvent(UiEvent.ShowMessage("Operation successful!"))
-
-                Log.i("FuelViewModel", "VM Step 6: ViewModel success path complete.")
 
             } catch (e: Exception) {
                 if (e is java.util.concurrent.CancellationException) {
                     throw e
                 }
-                Log.e("FuelViewModel", "VM Step ERROR: Exception caught in ViewModel's performOperation.", e)
                 lastFailedOperation = operation
                 val uniqueErrorMessage = "THIS IS THE CATCH BLOCK RUNNING - ${e.localizedMessage}"
                 emitEvent(UiEvent.ShowMessage(uniqueErrorMessage))
-                // emitEvent(UiEvent.ShowMessage("Error: ${e.localizedMessage}"))
             } finally {
                 emitLoading(false)
             }
@@ -191,8 +179,4 @@ class FuelViewModel @Inject constructor(
         super.onCleared()
         currentJob?.cancel()
     }
-
-    // You might also want a function to retry the last failed operation after authorization
-    // This would require storing the last requested operation in the ViewModel.
-    // For simplicity, we'll assume the UI re-triggers the original action.
 }

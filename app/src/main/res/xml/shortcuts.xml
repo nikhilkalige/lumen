@@ -8,23 +8,49 @@
             <parameter
                 android:name="odometer"
                 android:key="odometer"
-                android:mimeType="https://schema.org/Number"
-                />
-
-
+                android:mimeType="https://schema.org/Number"/>
             <parameter
                 android:name="gallons"
                 android:key="gallons"
-                android:mimeType="https://schema.org/Number"
-                />
-
-
+                android:mimeType="https://schema.org/Number"/>
             <parameter
                 android:name="cost"
                 android:key="cost"
-                android:mimeType="https://schema.org/Number"
-                />
-
+                android:mimeType="https://schema.org/Number"/>
         </intent>
+        <app-widget
+            android:identifier="CREATE_FUEL_ENTRY_WIDGET"
+            android:targetPackage="com.benki.lumen"
+            android:targetClass="com.benki.lumen.FuelEntryWidgetProvider">
+
+            <parameter
+                android:name="fuelEntry.odometer"
+                android:key="odometer" />
+            <parameter
+                android:name="fuelEntry.fuelAmount.value"
+                android:key="gallons" />
+            <parameter
+                android:name="fuelEntry.fuelCost"
+                android:key="cost" />
+            <extra android:name="hasTts" android:value="true"/>
+        </app-widget>
     </capability>
+
+<!--    <capability android:name="custom.actions.intent.CREATE_FUEL_ENTRY">-->
+<!--        <app-widget-->
+<!--            android:identifier="CREATE_FUEL_ENTRY_WIDGET"-->
+<!--            android:targetPackage="com.benki.lumen"-->
+<!--            android:targetClass="com.benki.lumen.FuelEntryWidgetProvider">-->
+
+<!--            &lt;!&ndash; Map the BII parameter to an intent extra key &ndash;&gt;-->
+<!--            <parameter-->
+<!--                android:name="fuelEntry.odometer"-->
+<!--                android:key="odometer" />-->
+
+<!--            &lt;!&ndash; You can map other parameters here as well &ndash;&gt;-->
+<!--            <parameter-->
+<!--                android:name="fuelEntry.fuelAmount.value"-->
+<!--                android:key="gallons" />-->
+<!--        </app-widget>-->
+<!--    </capability>-->
 </shortcuts>

@@ -104,7 +104,10 @@ dependencies {
     implementation(libs.google.api.services.drive)
     implementation(libs.google.api.services.drive)
     implementation(libs.google.api.services.oauth2)
-    implementation(libs.androidx.material.icons.extended.android) // Use the latest version
+    implementation(libs.androidx.material.icons.extended.android)
+    implementation(libs.widgets)
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
 
 
 

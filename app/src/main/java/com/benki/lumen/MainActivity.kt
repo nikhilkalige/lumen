@@ -102,12 +102,7 @@ class MainActivity : ComponentActivity() {
                 settingsViewModel.onFileSelectedFromWeb(fileId, fileName, mimeType)
             }
         }
-
         setIntent(Intent())
-        // intent?.data = null
-        // IMPORTANT: Clear the intent's data after processing.
-        // This prevents the deep link from being handled again if the user rotates the screen
-        // or the activity is otherwise recreated.
     }
 }
 
@@ -135,9 +130,6 @@ fun NavGraph(
     NavHost(navController, startDestination = "main") {
         composable("main") {
             MainScreenRoute(navController, fuelViewModel)
-            //LaunchedEffect(intentUri) {
-            //    fuelViewModel.handleIntentUri(intentUri)
-            //}
         }
         composable("settings") {
             SettingsScreen(navController, settingsViewModel)

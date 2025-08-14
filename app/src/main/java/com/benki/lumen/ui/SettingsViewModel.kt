@@ -9,15 +9,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.benki.lumen.datastore.SettingsDataStore
+import com.benki.lumen.model.FuelEntry
 import com.benki.lumen.network.AuthorizationRequiredException
 import com.benki.lumen.network.GoogleSheetsService
+import com.benki.lumen.network.SelectedSpreadsheet
 import com.benki.lumen.network.createFilePickerIntent
+import com.google.api.services.sheets.v4.model.Sheet
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 
@@ -48,9 +52,9 @@ class SettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            settingsDataStore.sheetIdFlow.collect { sheetId ->
-                _uiState.update { it.copy(selectedSheetId = sheetId) }
-                if (sheetId != null) {
+            settingsDataStore.sheetInfoFlow.collect { sheetInfo ->
+                _uiState.update { it.copy(selectedSheetId = sheetInfo?.id, selectedSheetName = sheetInfo?.name) }
+                if (sheetInfo?.id != null) {
                     checkUserIsAuthorized()
                 }
             }
@@ -163,6 +167,29 @@ class SettingsViewModel @Inject constructor(
 
     fun onErrorDismissed() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    /**
+     * Handles the file data received from the web-based picker deep link.
+     * This function should be called from your MainActivity's onNewIntent.
+     */
+    fun onFileSelectedFromWeb(fileId: String, fileName: String, mimeType: String?) {
+        viewModelScope.launch {
+            Log.d("SettingsViewModel", "Received from web: $fileName ($fileId)")
+            // Here, you need to save the sheet info, similar to onSheetSelectedFromPicker.
+            // You may need to create a simple Sheet data class if you don't have one.
+            // data class Sheet(val id: String, val name: String)
+            val sheet = SelectedSpreadsheet(id = fileId, name = fileName, uri = Uri.EMPTY)
+            settingsDataStore.saveSheet(sheet)
+
+            // Update the UI state to reflect the new selection
+            _uiState.update {
+                it.copy(
+                    selectedSheetId = fileId,
+                    selectedSheetName = fileName
+                )
+            }
+        }
     }
 }
 

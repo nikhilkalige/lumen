@@ -27,9 +27,33 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="lumen" android:host="add" />
+                <data android:scheme="lumen" android:pathPrefix="/" android:host="gas"/>
             </intent-filter>
-        </activity>
-    </application>
 
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <!-- This filter intercepts URLs starting with "lumen://picker-result" -->
+                <data
+                    android:host="picker-result"
+                    android:scheme="lumen" />
+            </intent-filter>
+
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts"/>
+        </activity>
+
+        <!-- <activity
+            android:name=".PickerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" /> -->
+
+        <!-- Add this activity to handle the result from the web picker -->
+        <!--<activity
+            android:name=".PickerActivity"
+            android:launchMode="singleTop"
+            android:exported="true">
+
+        </activity> -->
+    </application>
 </manifest>

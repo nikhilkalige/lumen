@@ -3,6 +3,7 @@ package com.benki.lumen.di
 import android.content.Context
 import com.benki.lumen.datastore.FuelEntriesDataStore
 import com.benki.lumen.datastore.SettingsDataStore
+import com.benki.lumen.network.SelectedSpreadsheet
 import com.benki.lumen.repository.SheetIdProvider
 import dagger.Module
 import dagger.Provides
@@ -37,11 +38,8 @@ object DataStoreModule {
     @Provides
     @Singleton // This provider can be a singleton if SettingsDataStore is a singleton
     @JvmSuppressWildcards
-//    fun provideSheetIdProvider(settingsDataStore: SettingsDataStore): SheetIdProvider { // Changed to non-nullable String
-//        return { settingsDataStore.sheetIdFlow.firstOrNull() } as SheetIdProvider  // Provide default empty string if null
-//    }
     fun provideSheetIdProvider(settingsDataStore: SettingsDataStore): SheetIdProvider =
         object : SheetIdProvider {
-            override suspend fun invoke(): String? = settingsDataStore.sheetIdFlow.firstOrNull()
+            override suspend fun invoke(): SelectedSpreadsheet? = settingsDataStore.sheetInfoFlow.firstOrNull()
         }
 }

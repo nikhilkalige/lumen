@@ -1,12 +1,11 @@
 package com.benki.lumen.ui
 
 import android.app.PendingIntent
-import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.benki.lumen.model.FuelEntry
 import com.benki.lumen.network.AuthorizationRequiredException
-import com.benki.lumen.network.GoogleSheetsService
 import com.benki.lumen.repository.FuelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -34,7 +33,7 @@ sealed class UiEvent {
 
 sealed class FuelOperation {
     data class Add(val entry: FuelEntry) : FuelOperation()
-    data class Delete(val entryId: String, val sheetId: Int, val rowNumber: Int) : FuelOperation()
+    data class Delete(val entry: FuelEntry) : FuelOperation()
 }
 
 data class UiState(
@@ -68,60 +67,106 @@ class FuelViewModel @Inject constructor(
         performOperation(FuelOperation.Add(entry))
     }
 
-    fun deleteFuelEntry(entryId: String, sheetId: Int, rowNumber: Int) {
-        performOperation(FuelOperation.Delete(entryId, sheetId, rowNumber))
+    fun deleteFuelEntry(entry: FuelEntry) {
+        performOperation(FuelOperation.Delete(entry))
     }
 
-    fun retryLastOperation() {
-        lastFailedOperation?.let { performOperation(it) }
+    fun retryLastOperation(entry: FuelEntry) {
+        performOperation(FuelOperation.Add(entry))
     }
 
-    
+    fun addFuelEntryFromIntent(gallons: String, odometer: String, cost: String, date: String?) {
+        // Create the FuelEntry object here in the ViewModel
+        try {
+            val entryDate = date.takeIf { !it.isNullOrBlank() }
+                ?.let { LocalDate.parse(it) }
+                ?: LocalDate.now()
 
-    fun handleIntentUri(intentUri: Uri?) {
-        if (intentUri == null) return
-
-        // Expecting uri format: lumen://add?date=2024-01-01&gallons=8.5&miles=220&cost=35.5
-        val gallonsStr = intentUri.getQueryParameter("gallons") ?: return
-        val milesStr = intentUri.getQueryParameter("miles") ?: return
-        val costStr = intentUri.getQueryParameter("cost") ?: return
-
-        val dateParam = intentUri.getQueryParameter("date")
-        val date = dateParam.takeIf { !it.isNullOrBlank() }
-            ?.let { LocalDate.parse(it) }
-            ?:LocalDate.now()
-
-        val entry = FuelEntry(
-            date = date,
-            gallons = gallonsStr.toDouble(),
-            miles = milesStr.toDouble(),
-            cost = costStr.toDouble()
-        )
-        addFuelEntry(entry)
+            val entry = FuelEntry(
+                date = entryDate,
+                gallons = gallons.toDouble(),
+                miles = odometer.toDouble(),
+                cost = cost.toDouble()
+            )
+            addFuelEntry(entry)
+        } catch (_: NumberFormatException) {
+            viewModelScope.launch {
+                emitEvent(UiEvent.ShowMessage("Error: Invalid number format in deep link."))
+            }
+        }
     }
 
-    private fun performOperation(operation: FuelOperation) {
-        currentJob?.cancel()
+    private fun performOperationx(operation: FuelOperation) {
+        if (currentJob?.isActive == true) {
+            viewModelScope.launch {
+                emitEvent(UiEvent.ShowMessage("Operation already in progress."))
+            }
+            return
+        }
+
         currentJob = viewModelScope.launch {
             emitLoading(true)
             try {
                 when (operation) {
                     is FuelOperation.Add -> fuelRepository.addEntry(operation.entry)
                     is FuelOperation.Delete -> fuelRepository.delete(
-                        operation.entryId,
+                        operation.entry.id
                     )
                 }
+
                 lastFailedOperation = null
                 emitEvent(UiEvent.DataSynced)
                 emitEvent(UiEvent.ShowMessage("Operation successful!"))
+
             } catch (e: AuthorizationRequiredException) {
                 lastFailedOperation = operation
-                e.pendingIntent?.let {
-                    emitEvent(UiEvent.ShowAuthorizationPrompt(it))
-                } ?: emitEvent(UiEvent.ShowMessage("Authorization required but intent missing."))
+                emitEvent(UiEvent.ShowAuthorizationPrompt(e.pendingIntent))
             } catch (e: Exception) {
                 lastFailedOperation = operation
                 emitEvent(UiEvent.ShowMessage("Error: ${e.localizedMessage}"))
+            } finally {
+                emitLoading(false)
+            }
+        }
+    }
+
+    private fun performOperation(operation: FuelOperation) {
+        if (currentJob?.isActive == true) {
+            Log.w("FuelViewModel", "Operation already in progress. Ignoring duplicate request.")
+            return
+        }
+
+        currentJob = viewModelScope.launch {
+            emitLoading(true)
+            try {
+                Log.d("FuelViewModel", "VM Step 1: Calling repository...")
+                when (operation) {
+                    is FuelOperation.Add -> fuelRepository.addEntry(operation.entry)
+                    is FuelOperation.Delete -> fuelRepository.delete(operation.entry.id)
+                }
+                Log.i("FuelViewModel", "VM Step 2: Repository call successful.")
+
+                // --- Granular logging for the success path ---
+                Log.d("FuelViewModel", "VM Step 3: Setting lastFailedOperation to null.")
+                lastFailedOperation = null
+
+                Log.d("FuelViewModel", "VM Step 4: Emitting DataSynced event.")
+                emitEvent(UiEvent.DataSynced)
+
+                Log.d("FuelViewModel", "VM Step 5: Emitting ShowMessage event.")
+                emitEvent(UiEvent.ShowMessage("Operation successful!"))
+
+                Log.i("FuelViewModel", "VM Step 6: ViewModel success path complete.")
+
+            } catch (e: Exception) {
+                if (e is java.util.concurrent.CancellationException) {
+                    throw e
+                }
+                Log.e("FuelViewModel", "VM Step ERROR: Exception caught in ViewModel's performOperation.", e)
+                lastFailedOperation = operation
+                val uniqueErrorMessage = "THIS IS THE CATCH BLOCK RUNNING - ${e.localizedMessage}"
+                emitEvent(UiEvent.ShowMessage(uniqueErrorMessage))
+                // emitEvent(UiEvent.ShowMessage("Error: ${e.localizedMessage}"))
             } finally {
                 emitLoading(false)
             }

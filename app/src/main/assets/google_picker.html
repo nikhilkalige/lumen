@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lumen File Picker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <!-- Load the Google APIs platform library -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <style>
+        /* Force the root elements to take up the full height */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #f0f2f5;
+        }
+        /* Use flexbox on the container to center its child */
+        .container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center; /* Center horizontally */
+            align-items: center;     /* Center vertically */
+            text-align: center;
+            padding-top: 200px;
+            box-sizing: border-box; /* Include padding in the element's total width and height */
+        }
+        button {
+            background-color: #4285F4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: background-color 0.2s;
+        }
+        button:disabled {
+            background-color: #9e9e9e;
+            cursor: not-allowed;
+        }
+        .loading-text {
+            font-size: 18px;
+            color: #666;
+        }
+        /* Critical CSS to make the picker dialog full-screen on mobile */
+        .picker-dialog {
+           border: 0 !important;
+           box-shadow: none !important;
+           left: 0 !important;
+           top: 0 !important;
+           width: 100% !important;
+           height: 100% !important;
+        }
+        .picker-dialog-content {
+            height: 100% !important;
+        }
+    </style>
+</head>
+<body>
+<div id="auth-container" class="container">
+    <!-- The button now starts disabled -->
+    <button id="auth-button" onclick="handleAuthClick()" disabled>Loading...</button>
+</div>
+<div id="loading-container" class="container" style="display: none;">
+    <p class="loading-text">Loading Picker...</p>
+</div>
+
+<script>
+    // --- CONFIGURATION ---
+// IMPORTANT: Replace with your actual Client ID from Google Cloud Console
+const CLIENT_ID = '514662388249-vvsn1murij0pknum1njs3bn6o642r4b8.apps.googleusercontent.com';
+// IMPORTANT: Replace with your actual API Key from Google Cloud Console
+const API_KEY = 'AIzaSyCUcYSGtiMpy3BOo4KIE5qCcwWFSzfIP_s';
+// The scope for accessing only files opened or created by the app
+const SCOPES = 'https://www.googleapis.com/auth/drive.file'
+// The custom URL scheme for your app
+const APP_SCHEME = 'lumen';
+
+   let tokenClient;
+   let accessToken = null;
+
+   /**
+    * Initializes the Google Auth client and loads the picker API.
+    */
+   function gapiLoaded() {
+       gapi.load('client:picker', initializePicker);
+   }
+
+   /**
+    * Initializes the Google Identity Services client.
+    */
+   function gisLoaded() {
+       tokenClient = google.accounts.oauth2.initTokenClient({
+           client_id: CLIENT_ID,
+           scope: SCOPES,
+           callback: (tokenResponse) => {
+               accessToken = tokenResponse.access_token;
+               // After getting the token, create and show the picker
+               createPicker();
+           },
+       });
+
+       // --- FIX ---
+       // Once the client is ready, enable the button and change its text.
+       const authButton = document.getElementById('auth-button');
+       if (authButton) {
+           authButton.disabled = false;
+           authButton.textContent = 'Select Spreadsheet';
+       }
+   }
+
+   /**
+    * Called when the "Select Spreadsheet" button is clicked.
+    * It initiates the OAuth 2.0 flow.
+    */
+   function handleAuthClick() {
+       // This check ensures tokenClient is not undefined
+       if (!tokenClient) {
+           console.error("Auth client not initialized.");
+           return;
+       }
+
+       document.getElementById('auth-container').style.display = 'none';
+       document.getElementById('loading-container').style.display = 'block';
+
+       if (accessToken === null) {
+           // Prompt the user to select a Google Account and ask for consent to share their data
+           tokenClient.requestAccessToken({ prompt: 'consent' });
+       } else {
+           // Skip display of account chooser and consent dialog for an existing session.
+           tokenClient.requestAccessToken({ prompt: '' });
+       }
+   }
+
+   /**
+    * Initializes the Picker API.
+    */
+   function initializePicker() {
+       // This function is empty because we now load the picker after authentication.
+   }
+
+   /**
+    * Creates and displays the Google Picker.
+    */
+   function createPicker() {
+       if (!accessToken) {
+           console.error("No access token available.");
+           document.getElementById('auth-container').style.display = 'block';
+           document.getElementById('loading-container').style.display = 'none';
+           return;
+       }
+
+       // Create a view for spreadsheets only
+       const view = new google.picker.View(google.picker.ViewId.SPREADSHEETS);
+       view.setMimeTypes("application/vnd.google-apps.spreadsheet");
+
+       const picker = new google.picker.PickerBuilder()
+           .setAppId(CLIENT_ID.split('-')[0]) // The App ID is the first part of the Client ID
+           .setOAuthToken(accessToken)
+           .addView(view)
+           .setDeveloperKey(API_KEY)
+           .setCallback(pickerCallback)
+           .build();
+
+       picker.setVisible(true);
+   }
+
+   /**
+    * The callback function that is executed when a user selects a file in the picker.
+    * @param {object} data - The data returned by the picker.
+    */
+   function pickerCallback(data) {
+       if (data.action === google.picker.Action.PICKED) {
+           const file = data.docs[0];
+           const fileId = file.id;
+           const fileName = file.name;
+
+           // Construct the custom URL and navigate to it.
+           // This will trigger the intent-filter in your Android app.
+           const resultUrl = `${APP_SCHEME}://picker-result?fileId=${encodeURIComponent(fileId)}&fileName=${encodeURIComponent(fileName)}`;
+           window.location.href = resultUrl;
+       } else if (data.action === google.picker.Action.CANCEL) {
+           // User cancelled the picker. Show the button again.
+           document.getElementById('auth-container').style.display = 'block';
+           document.getElementById('loading-container').style.display = 'none';
+       }
+   }
+</script>
+
+<!-- Load the GIS library -->
+<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+<!-- Load the GAPI library for the picker -->
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+</body>
+</html>

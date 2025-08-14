@@ -40,12 +40,4 @@ class MainViewModel @Inject constructor(
         )
         viewModelScope.launch { repository.addEntry(entry) }
     }
-
-    fun retry(entryId: String) {
-        viewModelScope.launch { repository.retry(entryId) }
-    }
-
-    fun delete(entryId: String) {
-        viewModelScope.launch { repository.delete(entryId) }
-    }
 }

@@ -73,6 +73,7 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.compose.navigation)
     implementation(libs.play.services.auth)
+    implementation(libs.androidx.material3)
     debugImplementation(libs.androidx.ui.tooling)
     implementation(libs.compose.material.icons.extended)
 

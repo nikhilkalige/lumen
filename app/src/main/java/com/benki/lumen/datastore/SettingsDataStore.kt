@@ -1,7 +1,8 @@
 package com.benki.lumen.datastore
 
 import android.content.Context
-import androidx.datastore.preferences.core.Preferences
+import android.net.Uri
+import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -26,7 +27,20 @@ class SettingsDataStore(private val context: Context) {
         val REFRESH_TOKEN = stringPreferencesKey("refresh_token")
     }
 
-    val sheetIdFlow: Flow<String?> = context.lumenDataStore.data.map { it[Keys.SHEET_ID] }
+    val sheetInfoFlow: Flow<SelectedSpreadsheet?> = context.lumenDataStore.data.map {
+        val sheetId = it[Keys.SHEET_ID]
+        val sheetName = it[Keys.SHEET_NAME]
+        val sheetUri = it[Keys.SHEET_URI]
+        if (sheetId != null && sheetName != null) {
+            SelectedSpreadsheet(
+                id = sheetId,
+                name = sheetName,
+                uri = sheetUri?.toUri() ?: Uri.EMPTY
+            )
+        } else {
+            null
+        }
+    }
 
     val accessTokenFlow: Flow<String?> = context.lumenDataStore.data.map { it[Keys.ACCESS_TOKEN] }
 

@@ -19,6 +19,7 @@ import com.google.api.services.oauth2.Oauth2
 import com.google.api.services.oauth2.Oauth2Scopes
 import com.google.api.services.sheets.v4.Sheets
 import com.google.api.services.sheets.v4.SheetsScopes
+import com.google.api.services.sheets.v4.model.AppendValuesResponse
 import com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest
 import com.google.api.services.sheets.v4.model.DeleteDimensionRequest
 import com.google.api.services.sheets.v4.model.DimensionRange
@@ -34,7 +35,6 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.text.get
 
 private const val TAG = "GoogleSheetsService"
 private const val APP_NAME = "Lumen" // Define app name as a constant
@@ -56,9 +56,11 @@ fun createFilePickerIntent(): Intent {
     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
         // addCategory(Intent.CATEGORY_OPENABLE)
         type = "application/vnd.google-apps.spreadsheet"
-        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
-            "application/vnd.google-apps.spreadsheet"
-        ))
+        putExtra(
+            Intent.EXTRA_MIME_TYPES, arrayOf(
+                "application/vnd.google-apps.spreadsheet"
+            )
+        )
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
 
@@ -73,13 +75,37 @@ fun createFilePickerIntent(): Intent {
  * Alternative method using Google Drive's picker (requires additional setup)
  * This creates an intent to open Google Drive's native picker
  */
-fun createDrivePickerIntent(): Intent {
+fun createDrivePickerIntentx(): Intent {
     return Intent(Intent.ACTION_GET_CONTENT).apply {
         type = "application/vnd.google-apps.spreadsheet"
         addCategory(Intent.CATEGORY_OPENABLE)
         putExtra(Intent.EXTRA_LOCAL_ONLY, false)
         // Force Google Drive to handle this
         setPackage("com.google.android.apps.docs")
+    }
+}
+
+fun createDrivePickerIntent(): Intent {
+    return Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        type = "*/*"
+        putExtra(
+            Intent.EXTRA_MIME_TYPES, arrayOf(
+                "application/vnd.google-apps.spreadsheet"
+            )
+        )
+        // These flags are crucial for write permissions
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+//        type = "application/vnd.google-apps.spreadsheet"
+//
+//        // These flags are crucial for write permissions
+//        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+//        addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+//        addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+//
+//        // Optional: Try to prefer Google Drive, but don't force it
+//        setPackage("com.google.android.apps.docs")
     }
 }
 
@@ -123,6 +149,7 @@ private fun extractFileIdFromUri(uri: Uri): String? {
                 }
             }
         }
+
         else -> null
     }
 }
@@ -176,6 +203,7 @@ class GoogleSheetsService @Inject constructor(private val context: Context) {
     // Cache the API service clients for efficiency. @Volatile ensures visibility across threads.
     @Volatile
     private var sheetsService: Sheets? = null
+
     @Volatile
     private var driveService: Drive? = null
 
@@ -195,7 +223,7 @@ class GoogleSheetsService @Inject constructor(private val context: Context) {
             true
         } catch (e: AuthorizationRequiredException) {
             false
-        } catch(e: Exception) {
+        } catch (e: Exception) {
             // Any other exception (network error, service issue, etc.) also means
             // we cannot proceed, so we consider the user not authorized.
             Log.e(TAG, "An unexpected error occurred during authorization check", e)
@@ -274,9 +302,10 @@ class GoogleSheetsService @Inject constructor(private val context: Context) {
     suspend fun getSignedInUserEmail(): String? = withContext(Dispatchers.IO) {
         serviceMutex.withLock {
             val credentials = getCredentials()
-            val oauth2Service = Oauth2.Builder(httpTransport, jsonFactory, HttpCredentialsAdapter(credentials))
-                .setApplicationName(APP_NAME)
-                .build()
+            val oauth2Service =
+                Oauth2.Builder(httpTransport, jsonFactory, HttpCredentialsAdapter(credentials))
+                    .setApplicationName(APP_NAME)
+                    .build()
             try {
                 oauth2Service.userinfo().get().execute()?.email
             } catch (e: Exception) {
@@ -287,113 +316,121 @@ class GoogleSheetsService @Inject constructor(private val context: Context) {
     }
 
     /**
-     * Searches for a spreadsheet by its exact name.
-     * @param name The exact name of the spreadsheet to find.
-     * @return The spreadsheet ID if found, otherwise null.
-     */
-    suspend fun searchForSheet(name: String): String? = withContext(Dispatchers.IO) {
-        // Escape single quotes in the name to prevent query errors.
-        val sanitizedName = name.replace("'", "\\'")
-        val query = "name = '$sanitizedName' and mimeType = 'application/vnd.google-apps.spreadsheet'"
-
-        try {
-            val files = getDriveService().files().list()
-                .setQ(query)
-                .setSpaces("drive")
-                .setFields("files(id)")
-                .execute()
-            files.files.firstOrNull()?.id
-        } catch (e: Exception) {
-            Log.e(TAG, "Error searching for sheet", e)
-            throw e // Propagate error to caller
-        }
-    }
-
-    /**
-     * Lists all spreadsheets accessible to the user.
-     * @return A list of Drive File objects.
-     */
-    suspend fun listSpreadsheets(): List<com.google.api.services.drive.model.File> = withContext(Dispatchers.IO) {
-        try {
-            getDriveService().files().list()
-                .setQ("mimeType = 'application/vnd.google-apps.spreadsheet'")
-                .setSpaces("drive")
-                .setFields("files(id, name)")
-                .execute()
-                .files ?: emptyList()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error listing spreadsheets", e)
-            throw e
-        }
-    }
-
-    /**
      * Appends a new row to the specified spreadsheet.
      */
-    suspend fun addData(fuelEntry: FuelEntry, spreadsheetId: String, range: String) = withContext(Dispatchers.IO) {
-        try {
-            val rowData = listOf(
-                listOf(fuelEntry.date.toString(), fuelEntry.gallons, fuelEntry.miles, fuelEntry.cost)
-            )
-            val body = ValueRange().setValues(rowData)
+    suspend fun addData(fuelEntry: FuelEntry, spreadsheetId: String, range: String): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val rowData = listOf(
+                    listOf(
+                        fuelEntry.id,
+                        fuelEntry.date.toString(),
+                        fuelEntry.gallons,
+                        fuelEntry.miles,
+                        fuelEntry.cost,
+                    )
+                )
+                val body = ValueRange().setValues(rowData)
 
-            getSheetsService().spreadsheets().values()
-                .append(spreadsheetId, range, body)
-                .setValueInputOption("USER_ENTERED")
-                .execute()
+                val response: AppendValuesResponse = getSheetsService().spreadsheets().values()
+                    .append(spreadsheetId, range, body)
+                    .setValueInputOption("USER_ENTERED")
+                    .setIncludeValuesInResponse(false) // We don't need the data echoed back
+                    .execute()
 
-            Log.d(TAG, "Data added successfully to spreadsheet $spreadsheetId")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error adding data to spreadsheet", e)
-            throw e
+                Log.d(
+                    TAG,
+                    "Data added successfully to spreadsheet $spreadsheetId at range ${response.updates.updatedRange}"
+                )
+                response.updates.updatedRange
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error adding data to spreadsheet", e)
+                throw e
+            }
         }
-    }
 
     /**
      * Deletes a specific row from a spreadsheet.
      */
-    suspend fun deleteRow(spreadsheetId: String, sheetId: Int, rowNumber: Int) = withContext(Dispatchers.IO) {
-        try {
-            val deleteRequest = DeleteDimensionRequest().setRange(
-                DimensionRange()
-                    .setSheetId(sheetId)
-                    .setDimension("ROWS")
-                    .setStartIndex(rowNumber - 1) // API is 0-indexed
-                    .setEndIndex(rowNumber)
-            )
+    suspend fun deleteRow(spreadSheetId: String, rowNumber: Int) =
+        withContext(Dispatchers.IO) {
+            try {
+                val deleteRequest = DeleteDimensionRequest().setRange(
+                    DimensionRange()
+                        .setSheetId(0)
+                        .setDimension("ROWS")
+                        .setStartIndex(rowNumber - 1) // API is 0-indexed
+                        .setEndIndex(rowNumber)
+                )
 
-            val batchUpdateRequest = BatchUpdateSpreadsheetRequest()
-                .setRequests(listOf(Request().setDeleteDimension(deleteRequest)))
+                val batchUpdateRequest = BatchUpdateSpreadsheetRequest()
+                    .setRequests(listOf(Request().setDeleteDimension(deleteRequest)))
 
-            getSheetsService().spreadsheets()
-                .batchUpdate(spreadsheetId, batchUpdateRequest)
-                .execute()
+                getSheetsService().spreadsheets()
+                    .batchUpdate(spreadSheetId, batchUpdateRequest)
+                    .execute()
 
-            Log.d(TAG, "Row $rowNumber deleted successfully from sheet $sheetId")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error deleting row", e)
-            throw e
+                Log.d(TAG, "Row $rowNumber deleted successfully from sheet $spreadSheetId")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleting row", e)
+                throw e
+            }
         }
-    }
+
+    suspend fun findRowNumberByUniqueId(spreadsheetId: String, uniqueId: String): Int? =
+        withContext(Dispatchers.IO) {
+            try {
+                val idColumnRange = "Sheet1!A:A" // Ensure this is the correct column for your IDs
+
+                val response: ValueRange = getSheetsService().spreadsheets().values()
+                    .get(spreadsheetId, idColumnRange)
+                    .setMajorDimension("COLUMNS")
+                    .execute()
+
+                val valuesList = response.values.toList()
+
+                @Suppress("UNCHECKED_CAST")
+                val actualData = valuesList[2] as? List<List<Any>>
+                val data: List<String> =
+                    actualData?.getOrNull(0)?.map { it.toString() } ?: emptyList()
+                // val rowIndex = data.indexOf(uniqueId)
+                val rowIndex = data.indexOfFirst { cellValue ->
+                    // Explicitly convert the cell's value to a String before comparing
+                    cellValue.toString() == uniqueId
+                }
+
+                if (rowIndex != -1) {
+                    val rowNumber = rowIndex + 1
+                    return@withContext rowNumber
+                } else {
+                    return@withContext null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Step ERROR: An exception occurred.", e)
+                return@withContext null
+            }
+        }
 
     /**
      * Gets spreadsheet details from a selected URI
      * @param uri The URI returned from the file picker
      * @return SelectedSpreadsheet object with ID and name, or null if unable to process
      */
-    suspend fun getSpreadsheetFromUri(uri: Uri): SelectedSpreadsheet? = withContext(Dispatchers.IO) {
-        try {
-            // Extract the file ID from the URI
-            getFileNameFromUri(context, uri)?.let { filename ->
-                searchForSheetByExactName(filename)?.let { sheetId ->
-                    SelectedSpreadsheet(sheetId, filename, uri)
+    suspend fun getSpreadsheetFromUri(uri: Uri): SelectedSpreadsheet? =
+        withContext(Dispatchers.IO) {
+            try {
+                // Extract the file ID from the URI
+                getFileNameFromUri(context, uri)?.let { filename ->
+                    searchForSheetByExactName(filename)?.let { sheetId ->
+                        SelectedSpreadsheet(sheetId, filename, uri)
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting spreadsheet from URI", e)
+                null
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting spreadsheet from URI", e)
-            null
         }
-    }
 
     /**
      * Method 3: Search for spreadsheet by exact name match
@@ -406,7 +443,14 @@ class GoogleSheetsService @Inject constructor(private val context: Context) {
 
             // Search for the exact spreadsheet name
             val files = getDriveService().files().list()
-                .setQ("name = '${cleanName.replace("'", "\\'")}' and mimeType = 'application/vnd.google-apps.spreadsheet'")
+                .setQ(
+                    "name = '${
+                        cleanName.replace(
+                            "'",
+                            "\\'"
+                        )
+                    }' and mimeType = 'application/vnd.google-apps.spreadsheet'"
+                )
                 .setSpaces("drive")
                 .setFields("files(id, name)")
                 .execute()
@@ -419,38 +463,4 @@ class GoogleSheetsService @Inject constructor(private val context: Context) {
         }
     }
 
-    /**
-     * Verifies that the user has access to a specific spreadsheet
-     * @param spreadsheetId The ID of the spreadsheet to verify
-     * @return true if accessible, false otherwise
-     */
-    suspend fun verifySpreadsheetAccess(spreadsheetId: String): Boolean = withContext(Dispatchers.IO) {
-        try {
-            getSheetsService().spreadsheets().get(spreadsheetId)
-                .setFields("spreadsheetId")
-                .execute()
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Cannot access spreadsheet with ID: $spreadsheetId", e)
-            false
-        }
-    }
-
-    /**
-     * Gets spreadsheet metadata including sheet names and IDs
-     */
-    suspend fun getSpreadsheetMetadata(spreadsheetId: String) = withContext(Dispatchers.IO) {
-        try {
-            val spreadsheet = getSheetsService().spreadsheets().get(spreadsheetId).execute()
-            spreadsheet.sheets.map { sheet ->
-                SheetInfo(
-                    sheetId = sheet.properties.sheetId,
-                    title = sheet.properties.title
-                )
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting spreadsheet metadata", e)
-            throw e
-        }
-    }
 }

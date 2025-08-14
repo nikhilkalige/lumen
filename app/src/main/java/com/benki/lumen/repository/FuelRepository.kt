@@ -1,14 +1,16 @@
 package com.benki.lumen.repository
 
+import android.util.Log
 import com.benki.lumen.datastore.FuelEntriesDataStore
 import com.benki.lumen.model.FuelEntry
 import com.benki.lumen.network.GoogleSheetsService
+import com.benki.lumen.network.SelectedSpreadsheet
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 interface SheetIdProvider {
-    suspend operator fun invoke(): String?
+    suspend operator fun invoke(): SelectedSpreadsheet?
 }
 
 class FuelRepository @Inject constructor(
@@ -21,55 +23,29 @@ class FuelRepository @Inject constructor(
     suspend fun addEntry(entry: FuelEntry) {
         // Save to local backup first
         localDataStore.addEntry(entry)
-        
-        // Try to sync with Google Sheets
-        val sheetId = sheetIdProvider()
-        if (sheetId != null) {
+
+        val sheetInfo = sheetIdProvider()
+        if (sheetInfo != null) {
             val updatedEntry = try {
-                service.addData(entry, sheetId, "Sheet1")
-                entry.copy(status = FuelEntry.Status.SYNCED)
+                val range = service.addData(entry, sheetInfo.id, "Sheet1")
+                entry.copy(status = FuelEntry.Status.SYNCED, sheetRange = range, spreadsheetId = sheetInfo.id, errorMessage = null)
             } catch (e: Exception) {
                 entry.copy(status = FuelEntry.Status.ERROR, errorMessage = e.localizedMessage)
-                throw e
             }
             localDataStore.updateEntry(entry.id, updatedEntry)
         }
     }
 
-    suspend fun retry(entryId: String) {
-        // Get current entries from local store
-        val currentEntries = localDataStore.entriesFlow.first()
-        val entry = currentEntries.find { it.id == entryId } ?: return
-        var retryEntry = entry.copy(status = FuelEntry.Status.PENDING, errorMessage = null)
-        
-        // Update local store first
-        localDataStore.updateEntry(entryId, retryEntry)
-        
-        // Try to sync with Google Sheets
-        val sheetId = sheetIdProvider()
-        if (sheetId != null) {
-            retryEntry = try {
-                service.addData(retryEntry, sheetId, "Sheet1")
-                retryEntry.copy(status = FuelEntry.Status.SYNCED)
-            } catch (e: Exception) {
-                retryEntry.copy(status = FuelEntry.Status.ERROR, errorMessage = e.localizedMessage)
-                throw e
-            }
-            localDataStore.updateEntry(entryId, retryEntry)
-        }
-    }
-
     suspend fun delete(entryId: String) {
-        // Get current entries from local store
-        val currentEntries = localDataStore.entriesFlow.first()
-        val entry = currentEntries.find { it.id == entryId } ?: return
-        
         // Delete from Google Sheets if it exists there
         val sheetId = sheetIdProvider()
-        if (sheetId != null && entry.sheetRowId != null) {
-            service.deleteRow(sheetId, 1,  1)
+        if (sheetId != null) {
+            val rowNumberToDelete = service.findRowNumberByUniqueId(sheetId.id, entryId);
+            Log.d("FuelRepository", "Row number to delete: $rowNumberToDelete")
+            if (rowNumberToDelete != null)
+                service.deleteRow(sheetId.id, rowNumberToDelete)
         }
-        
+
         // Delete from local backup
         localDataStore.deleteEntry(entryId)
     }

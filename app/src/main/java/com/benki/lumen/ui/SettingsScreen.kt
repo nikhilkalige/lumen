@@ -1,7 +1,9 @@
 package com.benki.lumen.ui
 
 import android.app.Activity
+import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -33,7 +35,10 @@ import androidx.compose.material.icons.filled.LinkOff // Correct import
 import androidx.compose.material.icons.filled.Login // Correct import
 import androidx.compose.material.icons.filled.Logout // Correct import
 import androidx.compose.material.icons.filled.Person // Correct import
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import com.benki.lumen.PickerActivity
+import androidx.core.net.toUri
 
 @Composable
 fun SettingsScreen(
@@ -41,6 +46,8 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current // <-- Get the context here
+
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult(),
@@ -63,14 +70,15 @@ fun SettingsScreen(
 
     }}
 
+    // --- EFFECT TO LAUNCH THE PICKER ---
     LaunchedEffect(uiState.launchSheetPicker) {
         if (uiState.launchSheetPicker) {
-            val intent = createDrivePickerIntent()
-            sheetPickerLauncher.launch(intent)
-            viewModel.onSheetPickerLaunched()
+            val url = "https://lumen.shortcircuits.dev"
+            val browserIntent = Intent(Intent.ACTION_VIEW, url.toUri())
+            context.startActivity(browserIntent)
+            viewModel.onSheetPickerLaunched() // Reset the event flag
         }
     }
-
 
     uiState.authorizationIntent?.let {
         LaunchedEffect(it) {

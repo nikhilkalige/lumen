@@ -13,6 +13,7 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.action.actionStartActivity
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.LocalAppWidgetOptions
 import androidx.glance.appwidget.provideContent
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
@@ -22,7 +23,6 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
 import androidx.glance.text.Text
 import com.google.assistant.appactions.widgets.AppActionsWidgetExtension
-import com.google.assistant.appactions.widgets.AppActionsWidgetExtension.EXTRA_APP_ACTIONS_BII
 /**
  * Class that defines a Stats Widget which provides data on the last activity performed
  * or with a BII it provides the last activity performed of requested activity type
@@ -31,7 +31,9 @@ import com.google.assistant.appactions.widgets.AppActionsWidgetExtension.EXTRA_A
 class FuelEntryWidget: GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
-            val options = currentState<AppActionsWidgetExtension.EXTRA_APP_ACTIONS_BII>()
+            val options = LocalAppWidgetOptions.current
+            val bii = options.getString(AppActionsWidgetExtension.EXTRA_APP_ACTIONS_BII)
+            val params = options.getBundle(AppActionsWidgetExtension.EXTRA_APP_ACTIONS_PARAMS)
             // create your AppWidget here
             MyContent()
         }

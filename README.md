@@ -7,6 +7,10 @@ the arguments and then push it to the google sheet.
 Hey Google, Use lumen to add gas entry 45 miles 53 gallons and 63 dollars
 ```
 
+![Fuel Logs](./docs/fuel.png)
+
+![Settings](./docs/settings.png)
+
 ## Note
 This is a very complicated solution to just build a command that can push data to google sheets. The google assistant is in a limbo with Gemini being pushed. The command fails to send the dollar amount consistently even 
 though it does understand it correctly in the UI. I wish there was an easy way :(.
